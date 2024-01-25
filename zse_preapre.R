@@ -300,8 +300,8 @@ file_name_local = fs::path("data", file_name)
 fwrite(clf_data, file_name_local)
 
 # Save to Azure blob
-file_name = "zse-predictors-20240117.csv"
-clf_data = fread(file.path("data", file_name))
+# file_name = "zse-predictors-20240117.csv"
+# clf_data = fread(file.path("data", file_name))
 endpoint = "https://snpmarketdata.blob.core.windows.net/"
 blob_key = readLines('./blob_key.txt')
 BLOBENDPOINT = storage_endpoint(endpoint, key=blob_key)

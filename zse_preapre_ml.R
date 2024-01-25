@@ -285,37 +285,6 @@ search_space_template = ps(
   filter_branch.selection = p_fct(levels = c("jmi", "relief"))
 )
 
-# # test graph preprocesing
-# task_ = task_ret_week$clone()
-# task_$filter(1:10000)
-# task_$nrow
-# gr_test_1 = graph_template$clone()
-# gr_test_1$param_set$values$filter_target_branch.selection = "nop_filter_target"
-# gr_test_1$param_set$values$subsample.frac = 0.9
-# gr_test_1$param_set$values$dropcorr.cutoff = 0.99
-# gr_test_1$param_set$values$filter_branch.selection = "jmi"
-# gr_test_1$param_set$values$interaction_branch.selection = "nop_interaction"
-# gr_test_1_res = gr_test_1$train(task_$clone())
-# gr_test_1_res
-# gr_test_2 = gr_test_1$clone()
-# gr_test_2$param_set$values$filter_target_branch.selection = "filter_target"
-# gr_test_2$param_set$values$filter_target.q = 0.1
-# gr_test_2_res = gr_test_2$train(task_ret_week$clone())
-# gr_test_2_res$removeconstants_3.output$data()
-# gr_test = graph_template$train(
-#   task_ret_week$clone(),
-#   subsample.frac = 0.3,
-#   filter_target_branch.selection = "filter_target",
-#   filter_target.threshold = 1,
-#   dropnacol.affect_columns = 0.05,
-#   dropcorr.cutoff = 0.99,
-#   winsorizesimple.probs_high = 0.99,
-#   winsorizesimple.probs_low = 0.01,
-#   scale_branch.selection = "uniformization",
-#   filter_branch.selection = "gausscovf3",
-#   interaction_branch.selection = "nop_interaction"
-# )
-
 # random forest graph
 graph_rf = graph_template %>>%
   po("learner", learner = lrn("regr.ranger"))
