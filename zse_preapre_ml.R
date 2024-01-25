@@ -507,7 +507,7 @@ sh_file = sprintf("
 
 #PBS -N ZSEML
 #PBS -l ncpus=4
-#PBS -l mem=8GB
+#PBS -l mem=4GB
 #PBS -J 1-%d
 #PBS -o experiments/logs
 #PBS -j oe
