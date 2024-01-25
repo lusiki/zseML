@@ -1,0 +1,6 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+data/rolling_predictors.csv
+data/zse-predictors*
