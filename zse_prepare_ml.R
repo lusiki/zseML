@@ -196,41 +196,41 @@ custom_cvs = list()
 custom_cvs[[1]] = create_custom_rolling_windows(task$clone(), 48, 1, 3, 1)
 custom_cvs[[2]] = create_custom_rolling_windows(task$clone(), 72, 1, 6, 1)
 
-# visualize test
-library(ggplot2)
-library(patchwork)
-prepare_cv_plot = function(x, set = "train") {
-  x = lapply(x, function(x) data.table(ID = x))
-  x = rbindlist(x, idcol = "fold")
-  x[, fold := as.factor(fold)]
-  x[, set := as.factor(set)]
-  x[, ID := as.numeric(ID)]
-}
-plot_cv = function(cv, n = 5) {
-  # cv = custom_cvs[[1]]
-  print(cv)
-  cv_test_inner = cv$inner
-  cv_test_outer = cv$outer
-
-  # prepare train, tune and test folds
-  train_sets = cv_test_inner$instance$train[1:n]
-  train_sets = prepare_cv_plot(train_sets)
-  tune_sets = cv_test_inner$instance$test[1:n]
-  tune_sets = prepare_cv_plot(tune_sets, set = "tune")
-  test_sets = cv_test_outer$instance$test[1:n]
-  test_sets = prepare_cv_plot(test_sets, set = "test")
-  dt_vis = rbind(train_sets, tune_sets, test_sets)
-  substr(colnames(dt_vis), 1, 1) <- toupper(substr(colnames(dt_vis), 1, 1))
-  ggplot(dt_vis, aes(x = Fold, y = ID, color = Set)) +
-    geom_point() +
-    theme_minimal() +
-    coord_flip() +
-    labs(x = "", y = '',
-         title = paste0(gsub("-.*|taskRet", "", cv_test_outer$id), " horizont"))
-}
-plots = lapply(custom_cvs, plot_cv, n = 35)
-wp = wrap_plots(plots)
-ggsave("plot_cv.png", plot = wp, width = 10, height = 8, dpi = 300)
+# # visualize test
+# library(ggplot2)
+# library(patchwork)
+# prepare_cv_plot = function(x, set = "train") {
+#   x = lapply(x, function(x) data.table(ID = x))
+#   x = rbindlist(x, idcol = "fold")
+#   x[, fold := as.factor(fold)]
+#   x[, set := as.factor(set)]
+#   x[, ID := as.numeric(ID)]
+# }
+# plot_cv = function(cv, n = 5) {
+#   # cv = custom_cvs[[1]]
+#   print(cv)
+#   cv_test_inner = cv$inner
+#   cv_test_outer = cv$outer
+# 
+#   # prepare train, tune and test folds
+#   train_sets = cv_test_inner$instance$train[1:n]
+#   train_sets = prepare_cv_plot(train_sets)
+#   tune_sets = cv_test_inner$instance$test[1:n]
+#   tune_sets = prepare_cv_plot(tune_sets, set = "tune")
+#   test_sets = cv_test_outer$instance$test[1:n]
+#   test_sets = prepare_cv_plot(test_sets, set = "test")
+#   dt_vis = rbind(train_sets, tune_sets, test_sets)
+#   substr(colnames(dt_vis), 1, 1) <- toupper(substr(colnames(dt_vis), 1, 1))
+#   ggplot(dt_vis, aes(x = Fold, y = ID, color = Set)) +
+#     geom_point() +
+#     theme_minimal() +
+#     coord_flip() +
+#     labs(x = "", y = '',
+#          title = paste0(gsub("-.*|taskRet", "", cv_test_outer$id), " horizont"))
+# }
+# plots = lapply(custom_cvs, plot_cv, n = 35)
+# wp = wrap_plots(plots)
+# ggsave("plot_cv.png", plot = wp, width = 10, height = 8, dpi = 300)
 
 
 # ADD PIPELINES -----------------------------------------------------------
