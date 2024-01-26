@@ -41,9 +41,9 @@ print("Prepare data")
 
 # read predictors
 if (interactive()) {
-  data_tbl = fread("data/zse-predictors-20240112.csv")
+  data_tbl = fread("data/zse-predictors-20240117.csv")
 } else {
-  data_tbl = fread("zse-predictors-20240112.csv")
+  data_tbl = fread("zse-predictors-20240117.csv")
 }
 
 # convert tibble to data.table
