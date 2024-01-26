@@ -11,6 +11,8 @@ library(future)
 library(future.apply)
 library(lubridate)
 library(finautoml)
+library(batchtools)
+library(mlr3batchmark)
 
 
 # SETUP -------------------------------------------------------------------
