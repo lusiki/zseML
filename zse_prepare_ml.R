@@ -43,9 +43,9 @@ print("Prepare data")
 
 # read predictors
 if (interactive()) {
-  data_tbl = fread("data/zse-predictors-20240117.csv")
+  data_tbl = fread("data/zse-predictors-20240126.csv")
 } else {
-  data_tbl = fread("zse-predictors-20240117.csv")
+  data_tbl = fread("zse-predictors-20240126.csv")
 }
 
 # convert tibble to data.table
@@ -389,15 +389,15 @@ designs_l = lapply(custom_cvs, function(cv_) {
   cv_outer = cv_$outer
   cat("Number of iterations fo cv inner is ", cv_inner$iters, "\n")
   
-  # # debug
-  # if (interactive()) {
-  #   to_ = 2
-  # } else {
-  #   to_ = cv_inner$iters
-  # }
-  to_ = cv_inner$iters
+  # debug
+  if (interactive()) {
+    ind_ = (cv_inner$iters-1):cv_inner$iters
+  } else {
+    ind_ = 1:cv_inner$iters
+  }
+  # to_ = cv_inner$iters
   
-  designs_cv_l = lapply(1:to_, function(i) { # 1:cv_inner$iters
+  designs_cv_l = lapply(ind_, function(i) { # 1:cv_inner$iters
     # debug
     # i = 1
     
@@ -497,7 +497,7 @@ reg = makeExperimentRegistry(file.dir = dirname_, seed = 1, packages = packages)
 
 # populate registry with problems and algorithms to form the jobs
 print("Batchmark")
-batchmark(designs, reg = reg)
+batchmark(designs, reg = reg, store_models = TRUE)
 
 # save registry
 print("Save registry")

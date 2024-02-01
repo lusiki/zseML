@@ -12,6 +12,7 @@ library(TTR)
 library(reticulate)
 library(lubridate)
 library(AzureStor)
+library(PerformanceAnalytics)
 # Python environment and python modules
 # Instructions: some functions use python modules. Steps to use python include:
 # 1. create new conda environment:
@@ -57,7 +58,7 @@ prices = unique(prices, by = c("isin", "date"))
 # remove observations where open, high, low, close columns are below 1e-008
 prices = prices[open > 1e-008 & high > 1e-008 & low > 1e-008 & close > 1e-008]
 
-# keep only isin with at least 2 years for data
+# keep only isin with at least 2 years of data
 isin_keep = prices[, .N, isin][N >= 2 * 252, isin]
 prices = prices[isin %chin% isin_keep]
 
@@ -67,18 +68,22 @@ prices[is.na(close), close := average]
 # sort
 setorder(prices, isin, date)
 
-# downsample to monthly data
+# add monthly column
 prices[, date := as.IDate(date)]
 prices[, month := round(date, digits = "month")]
 prices[, month := ceiling_date(month, unit = "month") - 1]
 
-# create a column last_month_day that will be equal to TRUEif date islast day of the month
-prices[, last_month_day := tail(date, 1) == date, by = month]
+# create a column last_month_day that will be equal to TRUE if date is last day of the month
+prices[, last_month_day := last(date, 1) == date, by = c("isin", "month")]
+
+# check if last_month_day works as expected
+isin_ = "HRHT00RA0005"
+prices[isin == isin_, .(isin, date, close, month, last_month_day)][1:99]
+tail(prices[isin == isin_, .(isin, date, close, month, last_month_day)], 100)
 
 # plot one stock
-isin_ht = "HRHT00RA0005" # INA d.d.
-data_plot = as.xts.data.table(prices[isin == isin_ht, .(date, close)])
-plot(data_plot, main = isin_ht)
+data_plot = as.xts.data.table(prices[isin == isin_, .(date, close)])
+plot(data_plot, main = isin_)
 
 
 # SUMMARY STATISTICS ------------------------------------------------------
@@ -92,6 +97,22 @@ ggplot(n_firms, aes(x = date, y = N_SMA)) +
   theme_bw() + 
   labs(title = "Simple moving average of number of companies through time", 
        x = "Date", y = "SMA Number of companies")
+
+# summary statistics for stocks returns
+prices_month = prices[last_month_day == TRUE, .(isin, date, close)]
+prices_month[, returns := close / shift(close, 1) - 1]
+summary_by_symbol = prices_month[, .(
+  mean = mean(returns, na.rm = TRUE),
+  median = median(returns, na.rm = TRUE),
+  sd = sd(returns, na.rm = TRUE),
+  skew = skewness(returns, na.rm = TRUE),
+  kurt = kurtosis(returns, na.rm = TRUE),
+  min = min(returns, na.rm = TRUE),
+  max = max(returns, na.rm = TRUE)
+), by = isin]
+summary_returns = summary_by_symbol[, lapply(.SD, mean), 
+                                    .SDcols = c("mean", "median", "sd", "skew", 
+                                                "kurt", "min", "max")]
 
 
 # PREDICTORS --------------------------------------------------------------
@@ -113,6 +134,7 @@ RollingExuberInit = RollingExuber$new(windows = c(125, 250, 500),
                                       lag = lag_,
                                       exuber_lag = 1L)
 RollingExuberFeatures = RollingExuberInit$get_rolling_features(OhlcvInstance$clone(), TRUE)
+
 
 # Forecast Features
 RollingForecatsInstance = RollingForecats$new(windows = c(500),
@@ -169,28 +191,8 @@ RollingWaveletArimaInstance = RollingWaveletArima$new(windows = 250,
                                                       filter = "haar")
 RollingWaveletArimaFeatures = RollingWaveletArimaInstance$get_rolling_features(OhlcvInstance$clone())
 
-# Fracdiff
-# Error in merge.data.table(x, y, by = c("symbol", "date")) : 
-#   x has some duplicated column name(s): d_1_250.x,d_fdGPH_0.1_250.x,sd.as_fdGPH_0.1_250.x,sd.reg_fdGPH_0.1_250.x,d_fdSperio_0.1_250.x,sd.as_fdSperio_0.1_250.x,sd.reg_fdSperio_0.1_250.x,d_1_250.y,d_fdGPH_0.1_250.y,sd.as_fdGPH_0.1_250.y,sd.reg_fdGPH_0.1_250.y,d_fdSperio_0.1_250.y,sd.as_fdSperio_0.1_250.y,sd.reg_fdSperio_0.1_250.y. Please remove or rename the duplicate(s) and try again.
-# In addition: Warning message:
-#   In merge.data.table(x, y, by = c("symbol", "date")) :
-#   column names 'd_1_250.x', 'd_fdGPH_0.1_250.x', 'sd.as_fdGPH_0.1_250.x', 'sd.reg_fdGPH_0.1_250.x', 'd_fdSperio_0.1_250.x', 'sd.as_fdSperio_0.1_250.x', 'sd.reg_fdSperio_0.1_250.x', 'd_1_250.y', 'd_fdGPH_0.1_250.y', 'sd.as_fdGPH_0.1_250.y', 'sd.reg_fdGPH_0.1_250.y', 'd_fdSperio_0.1_250.y', 'sd.as_fdSperio_0.1_250.y', 'sd.reg_fdSperio_0.1_250.y' are duplicated in the result
-# RollingFracdiffInstance = RollingFracdiff$new(windows = 250, 
-#                                               workers = 6L,
-#                                               lag = lag_, 
-#                                               at = at_,
-#                                               nar = c(1, 2), 
-#                                               nma = c(1, 2),
-#                                               bandw_exp = c(0.1, 0.5, 0.9))
-# RollingFracdiffFeatures = RollingFracdiffInstance$get_rolling_features(OhlcvInstance)
-
-# # prepare arguments for features
-# prices_events <- merge(prices_dt, dataset[, .(symbol, date, eps)],
-#                        by = c("symbol", "date"), all.x = TRUE, all.y = FALSE)
-# at_ <- which(!is.na(prices_events$eps))
-
 # merge all features test
-rolling_predictors <- Reduce(
+rolling_predictors = Reduce(
   function(x, y) merge( x, y, by = c("symbol", "date"), all.x = TRUE, all.y = FALSE),
   list(
     RollingBackCusumFeatures,
@@ -205,16 +207,16 @@ rolling_predictors <- Reduce(
 
 # Features from OHLLCV
 OhlcvFeaturesInit = OhlcvFeaturesDaily$new(at = NULL,
-                                           windows = c(125, 250, 500),
+                                           windows = c(22, 66, 125, 250, 500),
                                            quantile_divergence_window =  c(22, 66, 125, 250, 500))
 OhlcvFeaturesSet = OhlcvFeaturesInit$get_ohlcv_features(copy(OhlcvInstance$X))
 OhlcvFeaturesSetSample = OhlcvFeaturesSet[at_ - lag_]
 setorderv(OhlcvFeaturesSetSample, c("symbol", "date"))
 
 # check if dates from Ohlcvfeatures and Rolling features are as expeted
-isin_ht = "HRHT00RA0005" # INA d.d.
-OhlcvFeaturesSetSample[symbol == isin_ht, .(symbol, date_ohlcv = date)]
-rolling_predictors[symbol == isin_ht, .(symbol, date_rolling = date)]
+isin_ = "HRHT00RA0005"
+OhlcvFeaturesSetSample[symbol == isin_, .(symbol, date_ohlcv = date)]
+rolling_predictors[symbol == isin_, .(symbol, date_rolling = date)]
 # Seems good!
 
 # merge all predictors
@@ -223,7 +225,7 @@ OhlcvFeaturesSetSample[, date_ohlcv := date]
 features = rolling_predictors[OhlcvFeaturesSetSample, on=c("symbol", "date"), roll = -Inf]
 
 # check again merging dates
-features[symbol == isin_ht, .(symbol, date_rolling, date_ohlcv, date)]
+features[symbol == isin_, .(symbol, date_rolling, date_ohlcv, date)]
 features[, max(date)]
 
 # check for duplicates
@@ -232,7 +234,7 @@ features[duplicated(features[, .(symbol, date_ohlcv)]), .(symbol, date_ohlcv)]
 features[duplicated(features[, .(symbol, date_rolling)]), .(symbol, date_rolling)]
 features[duplicated(features[, .(symbol, date_rolling)]) | duplicated(features[, .(symbol, date_rolling)], fromLast = TRUE),
          .(symbol, date, date_ohlcv, date_rolling)]
-features = features[!duplicated(features[, .(symbol, date_rolling)])]
+features = unique(features, by = c("symbol", "date_rolling"))
 
 # merge predictors and monthly prices
 any(duplicated(prices[, .(isin, date)]))
@@ -266,14 +268,14 @@ dt = dt[, .SD, .SDcols = cols]
 
 # CLEAN DATA --------------------------------------------------------------
 # remove duplicates
-clf_data <- copy(dt)
+clf_data = copy(dt)
 any(duplicated(clf_data[, .(symbol, date)]))
 clf_data = unique(clf_data, by = c("symbol", "date"))
 
 # remove columns with many NA
-keep_cols <- names(which(colMeans(!is.na(clf_data)) > 0.5))
+keep_cols = names(which(colMeans(!is.na(clf_data)) > 0.5))
 print(paste0("Removing columns with many NA values: ", setdiff(colnames(clf_data), c(keep_cols, "right_time"))))
-clf_data <- clf_data[, .SD, .SDcols = keep_cols]
+clf_data = clf_data[, .SD, .SDcols = keep_cols]
 
 # remove Inf and Nan values if they exists
 is.infinite.data.frame = function(x) do.call(cbind, lapply(x, is.infinite))
