@@ -170,9 +170,9 @@ update$started = batchtools:::ustamp()
 result = execJob(job)
 
 # inspect some results if interactive
-if (intereactive()) {
-  result$learner_state$model$learner$state$model$relief$scores
-}
+# if (intereactive()) {
+#   result$learner_state$model$learner$state$model$relief$scores
+# }
 
 # save job
 writeRDS(result, file = getResultFiles(jc, id), compress = jc$compress)
