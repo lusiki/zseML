@@ -89,11 +89,21 @@ DT[, month := as.Date(month) + days(1)]
 DT[, .SD, .SDcols = is.Date]
 DT[, month := as.POSIXct(month, tz = "UTC")]
 
+#  remove symbols with low number of observations
+diff_in_months  = DT[, as.period(interval(max(date), min(date)), unit = "month"), by = "symbol"]
+diff_in_months[, V2 := as.integer((year(V1) * 12) + month(V1))]
+symbols_keep = DT[, .N, by = symbol][diff_in_months[, .(symbol, -V2)], on = "symbol"]
+symbols_keep[, keep := N / V2]
+hist(symbols_keep[, keep])
+symbols_keep[keep > 0.3]
+DT = DT[symbol %chin% symbols_keep[keep > 0.3, symbol]]
+
 
 # TARGETS -----------------------------------------------------------------
 # one month return as target variable
 setorder(DT, symbol, month)
-DT[, target := close / shift(close) - 1, by = symbol]
+DT[, .(symbol, date, close, target = shift(close, -1, type = "shift") / close - 1)]
+DT[, target := shift(close, -1, type = "shift") / close - 1, by = symbol]
 DT[symbol == "HRHT00RA0005", .(symbol, date, date_rolling, month, returns, close, target)]
 DT[, .(symbol, date, date_rolling, month, returns, close, target)]
 
@@ -520,3 +530,4 @@ apptainer run image.sif run_job.R 0
 sh_file_name = "run_jobs.sh"
 file.create(sh_file_name)
 writeLines(sh_file, sh_file_name)
+

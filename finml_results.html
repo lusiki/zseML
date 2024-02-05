@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>FinML Results</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="finml_results_files/libs/clipboard/clipboard.min.js"></script>
+<script src="finml_results_files/libs/quarto-html/quarto.js"></script>
+<script src="finml_results_files/libs/quarto-html/popper.min.js"></script>
+<script src="finml_results_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="finml_results_files/libs/quarto-html/anchor.min.js"></script>
+<link href="finml_results_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="finml_results_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="finml_results_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="finml_results_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="finml_results_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+<script src="finml_results_files/libs/kePrint-0.0.1/kePrint.js"></script>
+<link href="finml_results_files/libs/lightable-0.0.1/lightable.css" rel="stylesheet">
+<script src="finml_results_files/libs/htmlwidgets-1.6.4/htmlwidgets.js"></script>
+<link href="finml_results_files/libs/datatables-css-0.0.0/datatables-crosstalk.css" rel="stylesheet">
+<script src="finml_results_files/libs/datatables-binding-0.31/datatables.js"></script>
+<script src="finml_results_files/libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<link href="finml_results_files/libs/dt-core-1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
+<link href="finml_results_files/libs/dt-core-1.13.6/css/jquery.dataTables.extra.css" rel="stylesheet">
+<script src="finml_results_files/libs/dt-core-1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="finml_results_files/libs/jszip-1.13.6/jszip.min.js"></script>
+<script src="finml_results_files/libs/pdfmake-1.13.6/pdfmake.js"></script>
+<script src="finml_results_files/libs/pdfmake-1.13.6/vfs_fonts.js"></script>
+<link href="finml_results_files/libs/dt-ext-buttons-1.13.6/css/buttons.dataTables.min.css" rel="stylesheet">
+<script src="finml_results_files/libs/dt-ext-buttons-1.13.6/js/dataTables.buttons.min.js"></script>
+<script src="finml_results_files/libs/dt-ext-buttons-1.13.6/js/buttons.html5.min.js"></script>
+<script src="finml_results_files/libs/dt-ext-buttons-1.13.6/js/buttons.colVis.min.js"></script>
+<script src="finml_results_files/libs/dt-ext-buttons-1.13.6/js/buttons.print.min.js"></script>
+<link href="finml_results_files/libs/crosstalk-1.2.1/css/crosstalk.min.css" rel="stylesheet">
+<script src="finml_results_files/libs/crosstalk-1.2.1/js/crosstalk.min.js"></script>
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">FinML Results</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="summarize-jobs" class="level3">
+<h3 class="anchored" data-anchor-id="summarize-jobs">Summarize Jobs</h3>
+<div class="cell">
+<div class="cell-output-display">
+<table class="lightable-paper table table-sm table-striped small" data-quarto-postprocess="true">
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Total Jobs</td>
+<td style="text-align: right;">1764</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Done Jobs</td>
+<td style="text-align: right;">1764</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Nondone Jobs</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+</section>
+<section id="number-of-predictions-by-task" class="level3">
+<h3 class="anchored" data-anchor-id="number-of-predictions-by-task">NUMBER OF PREDICTIONS BY TASK</h3>
+<div class="cell">
+<div class="cell-output-display">
+<table class="lightable-paper table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Task</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">N</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">factorml</td>
+<td style="text-align: right;">155600</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+</section>
+<section id="number-of-predictions-by-task-and-cv" class="level3">
+<h3 class="anchored" data-anchor-id="number-of-predictions-by-task-and-cv">NUMBER OF PREDICTIONS BY TASK AND CV</h3>
+<div class="cell">
+<div class="cell-output-display">
+<table class="lightable-paper table table-sm table-striped small" data-quarto-postprocess="true">
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Task</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">CV</th>
+<th style="text-align: right;" data-quarto-table-cell-role="th">N</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">factorml</td>
+<td style="text-align: left;">234</td>
+<td style="text-align: right;">82488</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">factorml</td>
+<td style="text-align: left;">207</td>
+<td style="text-align: right;">73112</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+</section>
+<section id="performance-by-classif-measures" class="level3">
+<h3 class="anchored" data-anchor-id="performance-by-classif-measures">PERFORMANCE BY CLASSIF MEASURES</h3>
+<div class="cell">
+<div class="cell-output-display">
+
+<div class="datatables html-widget html-fill-item" id="htmlwidget-81aae4a4813fbb3229b2" style="width:100%;height:auto;"></div>
+<script type="application/json" data-for="htmlwidget-81aae4a4813fbb3229b2">{"x":{"filter":"none","vertical":false,"extensions":["Buttons"],"data":[["factorml","factorml","factorml","factorml","factorml","factorml","factorml","factorml","factorml","factorml","factorml","factorml","factorml","factorml"],["207","234","207","234","207","234","207","234","207","234","207","234","207","234"],["glmnet","glmnet","nnet","nnet","ranger","ranger","xgboost","xgboost","mean_resp","mean_resp","median_resp","median_resp","sum_resp","sum_resp"],[0.6975051975051975,0.6940160993114149,0.7922639238428713,0.7866841237513336,0.8047926468979101,0.802007564736689,0.7960389539336907,0.7953641741829115,0.8037531458584091,0.8006497914848221,0.8094977568661779,0.8082630200756473,0.8037531458584091,0.8006497914848221],[0.7191547721846904,0.7295096021947873,0.7708924153744041,0.7776823166725628,0.7870105062082139,0.795512595783042,0.7797471345858442,0.7901541521631029,0.7916594064006505,0.8008718818115766,0.7966121495327103,0.8064610866372981,0.7916594064006505,0.8008718818115766],[0.8765477959385835,0.8892256244121642,0.7909856364536899,0.8040547601630265,0.816245666171372,0.8299717838854634,0.8171124318969787,0.8302852962692027,0.8438583457157008,0.8639356254572056,0.8443536404160475,0.860905005747727,0.8438583457157008,0.8639356254572056],[0.6096804754112479,0.6184315720619231,0.7517947510886195,0.7529849285574477,0.7597971415398801,0.7638007309097904,0.7456497175141243,0.7537235556398824,0.7455420632315939,0.7463885879378838,0.7539805395842547,0.7584936930301077,0.7455420632315939,0.7463885879378838],[0.5557733777690649,0.5250158328055732,0.7932758282689669,0.7716457070478603,0.7957263281709469,0.7777978829277119,0.7793569888257205,0.7651316384691939,0.7720054891197804,0.7458608522573057,0.7819055087237796,0.7626888627521939,0.7720054891197804,0.7458608522573057],[0.8504574771261437,0.8455485939093691,0.8274205091503937,0.8197808535178778,0.8454488648198292,0.8408646322378717,0.8433389902418328,0.8389048705485567,0.8619897121593521,0.863607793840352,0.8638726445743989,0.8636410203872554,0.8619897121593521,0.863607793840352]],"container":"<table class=\"display\">\n  <thead>\n    <tr>\n      <th>task<\/th>\n      <th>cv<\/th>\n      <th>variable<\/th>\n      <th>acc<\/th>\n      <th>fbeta<\/th>\n      <th>tpr<\/th>\n      <th>precision<\/th>\n      <th>tnr<\/th>\n      <th>npv<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>","options":{"dom":"Blfrtip","pageLength":5,"buttons":["copy","csv","excel","pdf","print"],"lengthMenu":[[10,25,50,-1],["10","25","50","All"]],"columnDefs":[{"className":"dt-right","targets":[3,4,5,6,7,8]},{"name":"task","targets":0},{"name":"cv","targets":1},{"name":"variable","targets":2},{"name":"acc","targets":3},{"name":"fbeta","targets":4},{"name":"tpr","targets":5},{"name":"precision","targets":6},{"name":"tnr","targets":7},{"name":"npv","targets":8}],"order":[],"autoWidth":false,"orderClasses":false}},"evals":[],"jsHooks":[]}</script>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

@@ -4,3 +4,6 @@
 .Ruserdata
 data/rolling_predictors.csv
 data/zse-predictors*
+finml_results_cache/
+finml_results_files/
+

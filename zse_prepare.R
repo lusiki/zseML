@@ -90,7 +90,7 @@ plot(data_plot, main = isin_)
 # number of companies through time
 n_firms = prices[, .N, by = date]
 setorder(n_firms, date)
-n_firms[, N_SMA := SMA(N, 22)]
+n_firms[, N_SMA := TTR::SMA(N, 22)]
 n_firms = na.omit(n_firms)
 ggplot(n_firms, aes(x = date, y = N_SMA)) + 
   geom_line() + geom_point() + 
