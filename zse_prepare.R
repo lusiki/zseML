@@ -36,7 +36,6 @@ warnigns$filterwarnings('ignore')
 
 
 
-
 # SET UP ------------------------------------------------------------------
 # paths
 PATH_PREDICTORS = "F:/zse/predictors/monthly"
@@ -70,20 +69,36 @@ setorder(prices, isin, date)
 
 # add monthly column
 prices[, date := as.IDate(date)]
-prices[, month := round(date, digits = "month")]
-prices[, month := ceiling_date(month, unit = "month") - 1]
+prices[, week := ceiling_date(date, unit = "week") - 1]
+
+# test if week is fine
+prices[week >= date]
 
 # create a column last_month_day that will be equal to TRUE if date is last day of the month
-prices[, last_month_day := last(date, 1) == date, by = c("isin", "month")]
+prices[, last_week_day := last(date, 1) == date, by = c("isin", "week")]
 
-# check if last_month_day works as expected
+# check if last_week_day works as expected
 isin_ = "HRHT00RA0005"
-prices[isin == isin_, .(isin, date, close, month, last_month_day)][1:99]
-tail(prices[isin == isin_, .(isin, date, close, month, last_month_day)], 100)
+prices[isin == isin_, .(isin, date, close, week, last_week_day)][1:99]
+tail(prices[isin == isin_, .(isin, date, close, week, last_week_day)], 100)
 
 # plot one stock
 data_plot = as.xts.data.table(prices[isin == isin_, .(date, close)])
 plot(data_plot, main = isin_)
+
+#  remove symbols with low number of observations
+threshold = 0.7
+monnb = function(d) { lt = as.POSIXlt(as.Date(d, origin="1900-01-01")); lt$year*52 + lt$mon*4 }
+mondf = function(d1, d2) { as.integer(monnb(d2) - monnb(d1)) }
+diff_in_weeks = prices[, .(monthdiff = mondf(min(date), max(date))), by = "isin"]
+diff_in_weeks[, table(monthdiff)]
+symbols_keep = prices[last_week_day == TRUE][
+  , .(weeks_ = as.integer(.N)), by = isin][
+    diff_in_weeks[, .(isin, monthdiff)], on = "isin"]
+symbols_keep[, keep := weeks_ / monthdiff]
+hist(symbols_keep[, keep])
+symbols_keep[keep > threshold]
+prices = prices[isin %chin% symbols_keep[keep > threshold, isin]]
 
 
 # SUMMARY STATISTICS ------------------------------------------------------
@@ -99,7 +114,7 @@ ggplot(n_firms, aes(x = date, y = N_SMA)) +
        x = "Date", y = "SMA Number of companies")
 
 # summary statistics for stocks returns
-prices_month = prices[last_month_day == TRUE, .(isin, date, close)]
+prices_month = prices[last_week_day == TRUE, .(isin, date, close)]
 prices_month[, returns := close / shift(close, 1) - 1]
 summary_by_symbol = prices_month[, .(
   mean = mean(returns, na.rm = TRUE),
@@ -113,19 +128,18 @@ summary_by_symbol = prices_month[, .(
 summary_returns = summary_by_symbol[, lapply(.SD, mean), 
                                     .SDcols = c("mean", "median", "sd", "skew", 
                                                 "kurt", "min", "max")]
+summary_returns
 
 
 # PREDICTORS --------------------------------------------------------------
 # Ohlcv feaures
-OhlcvInstance = Ohlcv$new(prices[, .(isin, date, open, high, low, close, volume, last_month_day)],
-                          id_col = "isin",
-                          date_col = "date")
+OhlcvInstance = Ohlcv$new(prices, id_col = "isin", date_col = "date")
 
 # rolling parameters
-at_ = which(OhlcvInstance$X[, .(last_month_day)][[1]])
+at_ = which(OhlcvInstance$X[, .(last_week_day)][[1]])
 which(is.na(OhlcvInstance$X[at_, close]))
 which(is.na(OhlcvInstance$X[at_, returns]))
-lag_ = 1L
+lag_ = 0L
 
 # Exuber
 RollingExuberInit = RollingExuber$new(windows = c(125, 250, 500),
@@ -236,15 +250,15 @@ features[duplicated(features[, .(symbol, date_rolling)]) | duplicated(features[,
          .(symbol, date, date_ohlcv, date_rolling)]
 features = unique(features, by = c("symbol", "date_rolling"))
 
-# merge predictors and monthly prices
+# merge predictors and weekly prices
 any(duplicated(prices[, .(isin, date)]))
 any(duplicated(features[, .(symbol, date_rolling)]))
 features[, .(symbol, date_rolling, date_ohlcv, date)]
-prices[last_month_day == TRUE, .(isin, date, month)]
-dt = merge(features, prices[last_month_day == TRUE, .(isin, date, month)],
+prices[last_week_day == TRUE, .(isin, date, week)]
+dt = merge(features, prices[last_week_day == TRUE, .(isin, date)],
            by.x = c("symbol", "date_rolling"), by.y = c("isin", "date"),
            all.x = TRUE, all.y = FALSE)
-dt[, .(symbol, date, date_rolling, date_ohlcv)]
+dt[, .(symbol, date, date_rolling, date_ohlcv, week)]
 dt[duplicated(dt[, .(symbol, date)]), .(symbol, date)]
 dt[duplicated(dt[, .(symbol, date_ohlcv)]), .(symbol, date_ohlcv)]
 dt[duplicated(dt[, .(symbol, date_rolling)]), .(symbol, date_rolling)]
@@ -255,9 +269,9 @@ dt = dt[!is.na(date_ohlcv)]
 
 # FEATURES SPACE ----------------------------------------------------------
 # features space from features raw
-cols_remove = c("date_ohlcv", "last_month_day") # duplicate with date_ohlcv
+cols_remove = c("date_ohlcv", "last_week_day") # duplicate with date_ohlcv
 str(dt[, 1100:ncol(dt)])
-cols_non_features <- c("symbol", "date", "date_rolling", "month",
+cols_non_features <- c("symbol", "date", "date_rolling", "week",
                        "open", "high", "low", "close","volume", "returns")
 cols_predictors = setdiff(colnames(dt), c(cols_remove, cols_non_features))
 head(cols_predictors, 10)
@@ -269,19 +283,24 @@ dt = dt[, .SD, .SDcols = cols]
 # CLEAN DATA --------------------------------------------------------------
 # remove duplicates
 clf_data = copy(dt)
-any(duplicated(clf_data[, .(symbol, date)]))
-clf_data = unique(clf_data, by = c("symbol", "date"))
+if (any(duplicated(clf_data[, .(symbol, date)]))) {
+  clf_data = unique(clf_data, by = c("symbol", "date"))
+}
 
 # remove columns with many NA
 keep_cols = names(which(colMeans(!is.na(clf_data)) > 0.5))
 print(paste0("Removing columns with many NA values: ", setdiff(colnames(clf_data), c(keep_cols, "right_time"))))
-clf_data = clf_data[, .SD, .SDcols = keep_cols]
+if (length(setdiff(colnames(clf_data), c(keep_cols, "right_time"))) > 0) {
+  clf_data = clf_data[, .SD, .SDcols = keep_cols] 
+}
 
 # remove Inf and Nan values if they exists
 is.infinite.data.frame = function(x) do.call(cbind, lapply(x, is.infinite))
 keep_cols = names(which(colMeans(!is.infinite(as.data.frame(clf_data))) > 0.98))
 print(paste0("Removing columns with Inf values: ", setdiff(colnames(clf_data), keep_cols)))
-clf_data = clf_data[, .SD, .SDcols = keep_cols]
+if (length(setdiff(colnames(clf_data), keep_cols)) > 0) {
+  clf_data = clf_data[, .SD, .SDcols = keep_cols]
+}
 
 # remove inf values
 n_0 <- nrow(clf_data)

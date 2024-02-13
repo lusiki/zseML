@@ -58,17 +58,14 @@ status_summarize = melt(status_summarize)
 ```
 
 ```{r}
-status_summarize |>
-  kbl(format="html", col.names=NULL) |> 
+kbl(status_summarize, format="html", col.names=NULL) %>% 
   kable_paper(full_width=FALSE)
-  
-
 ```
 
 ```{r}
 # Get metadata for done jobs
-tabs = getJobTable(ids, reg = reg) |>
-  _[, .SD, .SDcols = c("job.id", "job.name", "repl", "prob.pars", "algo.pars")]
+tabs = getJobTable(ids, reg = reg)
+tabs = tabs[, .SD, .SDcols = c("job.id", "job.name", "repl", "prob.pars", "algo.pars")]
 predictions_meta = cbind.data.frame(
   id = tabs[, job.id],
   task = vapply(tabs$prob.pars, `[[`, character(1L), "task_id"),
@@ -142,19 +139,16 @@ preds = na.omit(preds)
 ### NUMBER OF PREDICTIONS BY TASK
 
 ```{r}
-# number of predictions by task
-preds[, .N, by = (Task = task)] |>
-  kbl(format="html") |>
+# number of predictions by tasks
+kbl(preds[, .N, by = (Task = task)], format="html") %>% 
   kable_paper(full_width=FALSE)
-
 ```
 
 ### NUMBER OF PREDICTIONS BY TASK AND CV
 
 ```{r}
 # number of predictions by task and cv
-preds[, .N, by = .(Task = task, CV = cv)] |>
-  kbl(format="html") |>
+kbl(preds[, .N, by = .(Task = task, CV = cv)], format="html") %>% 
   kable_paper(full_width=FALSE)
 ```
 
@@ -218,8 +212,7 @@ preds_perf = melt(predsw,
 
 ```{r}
 by_ = c("task", "cv", "variable")
-preds_perf[, calculate_msrs(truth, value), by = by_] |>
-  DT_template(pl=15)
+DT_template(preds_perf[, calculate_msrs(truth, value), by = by_], pl=15)
 ```
 
 ### PORTFOLIO RETURNS

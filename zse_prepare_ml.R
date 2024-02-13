@@ -43,9 +43,10 @@ print("Prepare data")
 
 # read predictors
 if (interactive()) {
-  data_tbl = fread("data/zse-predictors-20240126.csv")
+  # fs::dir_ls("data")
+  data_tbl = fread("data/zse-predictors-20240129.csv")
 } else {
-  data_tbl = fread("zse-predictors-20240126.csv")
+  data_tbl = fread("zse-predictors-20240129.csv")
 }
 
 # convert tibble to data.table
@@ -53,7 +54,7 @@ DT = as.data.table(data_tbl)
 
 # define predictors
 cols_non_features = c(
-  "symbol", "date", "date_rolling", "month", "open", "high", "low", "close", 
+  "symbol", "date", "date_rolling", "week", "open", "high", "low", "close", 
   "volume", "returns"
 )
 cols_features = setdiff(colnames(DT), cols_non_features)
@@ -85,27 +86,19 @@ DT = DT[, (names(factor_cols)) := lapply(.SD, as.factor), .SD = names(factor_col
 
 # change IDate to date, because of error
 DT[, .SD, .SDcols = is.Date]
-DT[, month := as.Date(month) + days(1)]
-DT[, .SD, .SDcols = is.Date]
-DT[, month := as.POSIXct(month, tz = "UTC")]
-
-#  remove symbols with low number of observations
-diff_in_months  = DT[, as.period(interval(max(date), min(date)), unit = "month"), by = "symbol"]
-diff_in_months[, V2 := as.integer((year(V1) * 12) + month(V1))]
-symbols_keep = DT[, .N, by = symbol][diff_in_months[, .(symbol, -V2)], on = "symbol"]
-symbols_keep[, keep := N / V2]
-hist(symbols_keep[, keep])
-symbols_keep[keep > 0.3]
-DT = DT[symbol %chin% symbols_keep[keep > 0.3, symbol]]
+# DT[, week := as.Date(week) + days(1)]
+# DT[, .SD, .SDcols = is.Date]
+DT[, week := as.POSIXct(week, tz = "UTC")]
+DT[, date := as.POSIXct(date, tz = "UTC")]
 
 
 # TARGETS -----------------------------------------------------------------
-# one month return as target variable
-setorder(DT, symbol, month)
+# one week return as target variable
+setorder(DT, symbol, week)
 DT[, .(symbol, date, close, target = shift(close, -1, type = "shift") / close - 1)]
 DT[, target := shift(close, -1, type = "shift") / close - 1, by = symbol]
-DT[symbol == "HRHT00RA0005", .(symbol, date, date_rolling, month, returns, close, target)]
-DT[, .(symbol, date, date_rolling, month, returns, close, target)]
+DT[symbol == "HRHT00RA0005", .(symbol, date, date_rolling, week, returns, close, target)]
+DT[, .(symbol, date, date_rolling, week, returns, close, target)]
 
 # remove observations with missing target
 DT = na.omit(DT, cols = "target")
@@ -115,8 +108,8 @@ DT = na.omit(DT, cols = "target")
 # setorder(DT, date)
 print("This was the problem")
 # DT = DT[order(date)] # DOESNT WORK TOO
-DT = DT[order(month)]
-head(DT[, .(symbol, date_rolling, month)], 30)
+DT = DT[order(week)]
+head(DT[, .(symbol, date_rolling, week)], 30)
 print("This was the problem. Solved.")
 
 
@@ -124,9 +117,9 @@ print("This was the problem. Solved.")
 print("Tasks")
 
 # id coluns we always keep
-id_cols = c("symbol", "month")
+id_cols = c("symbol", "date", "week")
 
-# task with future month returns as target
+# task with future week returns as target
 cols_ = c(id_cols, cols_features, "target")
 task = as_task_regr(DT[, ..cols_], id = "factorml", target = "target")
 
@@ -135,36 +128,55 @@ task$col_roles$feature = setdiff(task$col_roles$feature, id_cols)
 
 
 # CROSS VALIDATIONS -------------------------------------------------------
-create_custom_rolling_windows <- function(tsk_,
-                                          train_duration = 36,
-                                          gap_duration = 1,
-                                          tune_duration = 6,
-                                          test_duration = 1) {
+create_custom_rolling_windows = function(task,
+                                         duration_unit = "month",
+                                         train_duration,
+                                         gap_duration,
+                                         tune_duration,
+                                         test_duration) {
   # debug
-  tsk_ = task$clone()
+  duration_unit = "week"
+  train_duration = 48
+  
+  # Function to convert durations to the appropriate period
+  convert_duration <- function(duration) {
+    if (duration_unit == "week") {
+      weeks(duration)
+    } else { # defaults to months if not weeks
+      months(duration)
+    }
+  }
   
   # Define row ids
-  data = tsk_$backend$data(cols = c("month", "..row_id"),
+  data = task$backend$data(cols = c("date", "..row_id"),
                            rows = 1:task$nrow)
   setnames(data, "..row_id", "row_id")
-  stopifnot(all(tsk_$row_ids == data[, row_id]))
+  stopifnot(all(task$row_ids == data[, row_id]))
   
   # Ensure date is in Date format
-  data[, date_col := as.Date(month)]
+  data[, date_col := as.Date(date)]
   
   # Initialize start and end dates based on duration unit
-  start_date = data[, min(date_col)]
-  end_date = data[, max(date_col)]
+  start_date <- if (duration_unit == "week") {
+    floor_date(min(data$date_col), "week")
+  } else {
+    floor_date(min(data$date_col), "month")
+  }
+  end_date <- if (duration_unit == "week") {
+    ceiling_date(max(data$date_col), "week") - days(1)
+  } else {
+    ceiling_date(max(data$date_col), "month") - days(1)
+  }
   
   # Initialize folds list
-  folds = list()
+  folds <- list()
   
   while (start_date < end_date) {
-    train_end = start_date %m+% months(train_duration)
-    gap1_end  = train_end %m+% months(gap_duration)
-    tune_end  = gap1_end %m+% months(tune_duration)
-    gap2_end  = tune_end %m+% months(gap_duration)
-    test_end  = gap2_end %m+% months(test_duration)
+    train_end = start_date %m+% convert_duration(train_duration) - days(1)
+    gap1_end  = train_end %m+% convert_duration(gap_duration)
+    tune_end  = gap1_end %m+% convert_duration(tune_duration)
+    gap2_end  = tune_end %m+% convert_duration(gap_duration)
+    test_end  = gap2_end %m+% convert_duration(test_duration) - days(1)
     
     # Ensure the fold does not exceed the data range
     if (test_end > end_date) {
@@ -179,7 +191,11 @@ create_custom_rolling_windows <- function(tsk_,
     folds[[length(folds) + 1]] <- list(train = train_indices, tune = tune_indices, test = test_indices)
     
     # Update the start date for the next fold
-    start_date = start_date %m+% months(1)
+    start_date = if (duration_unit == "week") {
+      start_date %m+% weeks(1)
+    } else {
+      start_date %m+% months(1)
+    }
   }
   
   # Prepare sets for inner and outer resampling
@@ -205,44 +221,49 @@ create_custom_rolling_windows <- function(tsk_,
 
 # create list of cvs
 custom_cvs = list()
-custom_cvs[[1]] = create_custom_rolling_windows(task$clone(), 48, 1, 3, 1)
-custom_cvs[[2]] = create_custom_rolling_windows(task$clone(), 72, 1, 6, 1)
+custom_cvs[[1]] = create_custom_rolling_windows(task$clone(), "week", 4*48, 1, 3*4, 1)
+custom_cvs[[2]] = create_custom_rolling_windows(task$clone(), "week", 4*72, 1, 6*4, 1)
 
-# # visualize test
-# library(ggplot2)
-# library(patchwork)
-# prepare_cv_plot = function(x, set = "train") {
-#   x = lapply(x, function(x) data.table(ID = x))
-#   x = rbindlist(x, idcol = "fold")
-#   x[, fold := as.factor(fold)]
-#   x[, set := as.factor(set)]
-#   x[, ID := as.numeric(ID)]
-# }
-# plot_cv = function(cv, n = 5) {
-#   # cv = custom_cvs[[1]]
-#   print(cv)
-#   cv_test_inner = cv$inner
-#   cv_test_outer = cv$outer
-# 
-#   # prepare train, tune and test folds
-#   train_sets = cv_test_inner$instance$train[1:n]
-#   train_sets = prepare_cv_plot(train_sets)
-#   tune_sets = cv_test_inner$instance$test[1:n]
-#   tune_sets = prepare_cv_plot(tune_sets, set = "tune")
-#   test_sets = cv_test_outer$instance$test[1:n]
-#   test_sets = prepare_cv_plot(test_sets, set = "test")
-#   dt_vis = rbind(train_sets, tune_sets, test_sets)
-#   substr(colnames(dt_vis), 1, 1) <- toupper(substr(colnames(dt_vis), 1, 1))
-#   ggplot(dt_vis, aes(x = Fold, y = ID, color = Set)) +
-#     geom_point() +
-#     theme_minimal() +
-#     coord_flip() +
-#     labs(x = "", y = '',
-#          title = paste0(gsub("-.*|taskRet", "", cv_test_outer$id), " horizont"))
-# }
-# plots = lapply(custom_cvs, plot_cv, n = 35)
-# wp = wrap_plots(plots)
-# ggsave("plot_cv.png", plot = wp, width = 10, height = 8, dpi = 300)
+# visualize test
+if (interactive()) {
+  library(ggplot2)
+  library(patchwork)
+  prepare_cv_plot = function(x, set = "train") {
+    x = lapply(x, function(x) data.table(ID = x))
+    x = rbindlist(x, idcol = "fold")
+    x[, fold := as.factor(fold)]
+    x[, set := as.factor(set)]
+    x[, ID := as.numeric(ID)]
+  }
+  plot_cv = function(cv, n = 5) {
+    # cv = custom_cvs[[1]]
+    print(cv)
+    cv_test_inner = cv$inner
+    cv_test_outer = cv$outer
+    
+    # prepare train, tune and test folds
+    train_sets = cv_test_inner$instance$train[1:n]
+    train_sets = prepare_cv_plot(train_sets)
+    tune_sets = cv_test_inner$instance$test[1:n]
+    tune_sets = prepare_cv_plot(tune_sets, set = "tune")
+    test_sets = cv_test_outer$instance$test[1:n]
+    test_sets = prepare_cv_plot(test_sets, set = "test")
+    dt_vis = rbind(train_sets[seq(1, nrow(train_sets), 10)],
+                   tune_sets[seq(1, nrow(tune_sets), 5)],
+                   test_sets[seq(1, nrow(test_sets), 2)])
+    substr(colnames(dt_vis), 1, 1) = toupper(substr(colnames(dt_vis), 1, 1))
+    ggplot(dt_vis, aes(x = Fold, y = ID, color = Set)) +
+      geom_point() +
+      theme_minimal() +
+      coord_flip() +
+      labs(x = "", y = '',
+           title = paste0(gsub("-.*", "", cv_test_outer$id)))
+  }
+  plots = lapply(custom_cvs, plot_cv, n = 30)
+  wp = wrap_plots(plots)
+  ggsave("plot_cv.png", plot = wp, width = 10, height = 8, dpi = 300)
+}
+
 
 
 # ADD PIPELINES -----------------------------------------------------------
