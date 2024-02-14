@@ -528,7 +528,7 @@ reg = makeExperimentRegistry(file.dir = dirname_, seed = 1, packages = packages)
 
 # populate registry with problems and algorithms to form the jobs
 print("Batchmark")
-batchmark(designs, reg = reg, store_models = TRUE)
+batchmark(designs, reg = reg, store_models = FALSE)
 
 # save registry
 print("Save registry")
