@@ -567,53 +567,53 @@ designs = do.call(rbind, designs_l)
 # y[, lapply(.SD, function(x) sd(x))]
 # 
 # bmr_dt$learner[[1]]$state$model$learner$predict_newdata(x)
-
-if (interactive()) {
-  # show all combinations from search space, like in grid
-  sp_grid = generate_design_grid(search_space_template, 1)
-  sp_grid = sp_grid$data
-  sp_grid
-
-  # check ids of nth cv sets
-  task_ = task$clone()
-  # rows_ = custom_cvs[[1]]$outer$test_set(1L)
-  rows_ = designs$resampling[[5]]$test_set(1L)
-  task_$filter(rows_)
-  gr_test = graph_template$clone()
-  # gr_test$param_set$values$filter_target_branch.selection = fb_
-  # gr_test$param_set$values$filter_target_id.q = 0.3
-  system.time({res = gr_test$train(task_)})
-  res$removeconstants_3.output$data()
-}
-graph_template_2 =
-  po("dropnacol", id = "dropnacol", cutoff = 0.05) %>>%
-  po("dropna", id = "dropna") %>>%
-  po("removeconstants", id = "removeconstants_1", ratio = 0)  %>>%
-  po("fixfactors", id = "fixfactors") %>>%
-  po("winsorizesimple", 
-     id = "winsorizesimple", 
-     probs_low = as.numeric(best_params_$winsorizesimple.probs_low), 
-     probs_high = as.numeric(best_params_$winsorizesimple.probs_high), 
-     na.rm = TRUE) %>>%
-  po("removeconstants", id = "removeconstants_2", ratio = 0)  %>>%
-  po("dropcorr", id = "dropcorr", cutoff = as.numeric(best_params_$dropcorr.cutoff)) %>>%
-  po("uniformization") %>>%
-  po("dropna", id = "dropna_v2") %>>%
-  # po("branch", options = c("jmi", "relief"), id = "filter_branch") %>>%
-  # gunion(list(po("filter", filter = flt("jmi"), filter.nfeat = 25),
-  #             po("filter", filter = flt("relief"), filter.nfeat = 25)
-  # )) %>>%
-  # po("unbranch", id = "filter_unbranch") %>>%
-  po("removeconstants", id = "removeconstants_3")
-task_ = task$clone()
-rows_ = designs$resampling[[5]]$test_set(1L)
-task_$filter(rows_)
-res = graph_template_2$train(task_)
-dtt = res$removeconstants_3.output$data()
-dtt[, 1:5]
-dtt[, ..cols]
-cols %in% colnames(res$removeconstants_3.output$data())
-cols[cols %notin% colnames(res$removeconstants_3.output$data())]
+# 
+# if (interactive()) {
+#   # show all combinations from search space, like in grid
+#   sp_grid = generate_design_grid(search_space_template, 1)
+#   sp_grid = sp_grid$data
+#   sp_grid
+# 
+#   # check ids of nth cv sets
+#   task_ = task$clone()
+#   # rows_ = custom_cvs[[1]]$outer$test_set(1L)
+#   rows_ = designs$resampling[[5]]$test_set(1L)
+#   task_$filter(rows_)
+#   gr_test = graph_template$clone()
+#   # gr_test$param_set$values$filter_target_branch.selection = fb_
+#   # gr_test$param_set$values$filter_target_id.q = 0.3
+#   system.time({res = gr_test$train(task_)})
+#   res$removeconstants_3.output$data()
+# }
+# graph_template_2 =
+#   po("dropnacol", id = "dropnacol", cutoff = 0.05) %>>%
+#   po("dropna", id = "dropna") %>>%
+#   po("removeconstants", id = "removeconstants_1", ratio = 0)  %>>%
+#   po("fixfactors", id = "fixfactors") %>>%
+#   po("winsorizesimple", 
+#      id = "winsorizesimple", 
+#      probs_low = as.numeric(best_params_$winsorizesimple.probs_low), 
+#      probs_high = as.numeric(best_params_$winsorizesimple.probs_high), 
+#      na.rm = TRUE) %>>%
+#   po("removeconstants", id = "removeconstants_2", ratio = 0)  %>>%
+#   po("dropcorr", id = "dropcorr", cutoff = as.numeric(best_params_$dropcorr.cutoff)) %>>%
+#   po("uniformization") %>>%
+#   po("dropna", id = "dropna_v2") %>>%
+#   # po("branch", options = c("jmi", "relief"), id = "filter_branch") %>>%
+#   # gunion(list(po("filter", filter = flt("jmi"), filter.nfeat = 25),
+#   #             po("filter", filter = flt("relief"), filter.nfeat = 25)
+#   # )) %>>%
+#   # po("unbranch", id = "filter_unbranch") %>>%
+#   po("removeconstants", id = "removeconstants_3")
+# task_ = task$clone()
+# rows_ = designs$resampling[[5]]$test_set(1L)
+# task_$filter(rows_)
+# res = graph_template_2$train(task_)
+# dtt = res$removeconstants_3.output$data()
+# dtt[, 1:5]
+# dtt[, ..cols]
+# cols %in% colnames(res$removeconstants_3.output$data())
+# cols[cols %notin% colnames(res$removeconstants_3.output$data())]
 
 # exp dir
 if (LIVE) {
