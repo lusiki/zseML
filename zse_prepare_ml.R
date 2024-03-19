@@ -16,6 +16,9 @@ library(mlr3batchmark)
 
 
 # SETUP -------------------------------------------------------------------
+# PARAMETERS
+LIVE = FALSE
+
 # snake to camel
 snakeToCamel <- function(snake_str) {
   # Replace underscores with spaces
@@ -34,7 +37,7 @@ snakeToCamel <- function(snake_str) {
   return(camel_case_str)
 }
 
-# path to save predictors
+# Globals
 PATH_RESULTS = "F:/zse/results"
 
 
@@ -44,19 +47,19 @@ print("Prepare data")
 # read predictors
 if (interactive()) {
   # fs::dir_ls("data")
-  data_tbl = fread("data/zse-predictors-20240129.csv")
+  DT = fread("data/zse-predictors-20240318.csv")
 } else {
-  data_tbl = fread("zse-predictors-20240129.csv")
+  DT = fread("zse-predictors-20240318.csv")
 }
 
 # convert tibble to data.table
-DT = as.data.table(data_tbl)
+setDT(DT)
+
+# Remove week, maybe this will help with no predictions in last fold
+DT[, let(week = NULL, high = NULL, low = NULL, date_rolling = NULL)]
 
 # define predictors
-cols_non_features = c(
-  "symbol", "date", "date_rolling", "week", "open", "high", "low", "close", 
-  "volume", "returns"
-)
+cols_non_features = c("symbol", "date", "open", "close", "volume", "returns")
 cols_features = setdiff(colnames(DT), cols_non_features)
 
 # change feature and targets columns names due to lighgbm
@@ -88,42 +91,41 @@ DT = DT[, (names(factor_cols)) := lapply(.SD, as.factor), .SD = names(factor_col
 DT[, .SD, .SDcols = is.Date]
 # DT[, week := as.Date(week) + days(1)]
 # DT[, .SD, .SDcols = is.Date]
-DT[, week := as.POSIXct(week, tz = "UTC")]
 DT[, date := as.POSIXct(date, tz = "UTC")]
 
 
 # TARGETS -----------------------------------------------------------------
 # one week return as target variable
-setorder(DT, symbol, week)
-DT[, .(symbol, date, close, target = shift(close, -1, type = "shift") / close - 1)]
+setorder(DT, symbol, date)
 DT[, target := shift(close, -1, type = "shift") / close - 1, by = symbol]
-DT[symbol == "HRHT00RA0005", .(symbol, date, date_rolling, week, returns, close, target)]
-DT[, .(symbol, date, date_rolling, week, returns, close, target)]
+DT[symbol == "HRHT00RA0005", .(symbol, date, returns, close, target)]
+DT[, .(symbol, date, returns, close, target)]
 
 # remove observations with missing target
 DT = na.omit(DT, cols = "target")
 
-# sort
-# this returns error on HPC. Some problem with memory
-# setorder(DT, date)
-print("This was the problem")
-# DT = DT[order(date)] # DOESNT WORK TOO
-DT = DT[order(week)]
-head(DT[, .(symbol, date_rolling, week)], 30)
-print("This was the problem. Solved.")
+# Sort by date
+DT = DT[order(date)]
+head(DT[, .(symbol, date)], 30)
+
+# inspect
+DT[1:10, 1:10]
+DT[, max(date)]
+DT[date > (max(date) - 10)][, 1:10]
+DT[date > (max(date) - 10)][, target]
 
 
 # TASKS -------------------------------------------------------------------
 print("Tasks")
 
 # id coluns we always keep
-id_cols = c("symbol", "date", "week")
+id_cols = c("symbol", "date")
 
 # task with future week returns as target
 cols_ = c(id_cols, cols_features, "target")
 task = as_task_regr(DT[, ..cols_], id = "factorml", target = "target")
 
-# set roles for symbol, date and yearmonth_id
+# Set roles for id columns
 task$col_roles$feature = setdiff(task$col_roles$feature, id_cols)
 
 
@@ -134,9 +136,12 @@ create_custom_rolling_windows = function(task,
                                          gap_duration,
                                          tune_duration,
                                          test_duration) {
-  # debug
-  duration_unit = "week"
-  train_duration = 48
+  # # debug
+  # duration_unit = "week"
+  # train_duration = 48
+  # gap_duration = 1
+  # tune_duration = 3*4
+  # test_duration = 1
   
   # Function to convert durations to the appropriate period
   convert_duration <- function(duration) {
@@ -221,48 +226,56 @@ create_custom_rolling_windows = function(task,
 
 # create list of cvs
 custom_cvs = list()
+custom_cvs[[1]] = create_custom_rolling_windows(task$clone(), "week", 48, 1, 3*4, 1) # TEST
 custom_cvs[[1]] = create_custom_rolling_windows(task$clone(), "week", 4*48, 1, 3*4, 1)
 custom_cvs[[2]] = create_custom_rolling_windows(task$clone(), "week", 4*72, 1, 6*4, 1)
 
 # visualize test
-if (interactive()) {
-  library(ggplot2)
-  library(patchwork)
-  prepare_cv_plot = function(x, set = "train") {
-    x = lapply(x, function(x) data.table(ID = x))
-    x = rbindlist(x, idcol = "fold")
-    x[, fold := as.factor(fold)]
-    x[, set := as.factor(set)]
-    x[, ID := as.numeric(ID)]
-  }
-  plot_cv = function(cv, n = 5) {
-    # cv = custom_cvs[[1]]
-    print(cv)
-    cv_test_inner = cv$inner
-    cv_test_outer = cv$outer
-    
-    # prepare train, tune and test folds
-    train_sets = cv_test_inner$instance$train[1:n]
-    train_sets = prepare_cv_plot(train_sets)
-    tune_sets = cv_test_inner$instance$test[1:n]
-    tune_sets = prepare_cv_plot(tune_sets, set = "tune")
-    test_sets = cv_test_outer$instance$test[1:n]
-    test_sets = prepare_cv_plot(test_sets, set = "test")
-    dt_vis = rbind(train_sets[seq(1, nrow(train_sets), 10)],
-                   tune_sets[seq(1, nrow(tune_sets), 5)],
-                   test_sets[seq(1, nrow(test_sets), 2)])
-    substr(colnames(dt_vis), 1, 1) = toupper(substr(colnames(dt_vis), 1, 1))
-    ggplot(dt_vis, aes(x = Fold, y = ID, color = Set)) +
-      geom_point() +
-      theme_minimal() +
-      coord_flip() +
-      labs(x = "", y = '',
-           title = paste0(gsub("-.*", "", cv_test_outer$id)))
-  }
-  plots = lapply(custom_cvs, plot_cv, n = 30)
-  wp = wrap_plots(plots)
-  ggsave("plot_cv.png", plot = wp, width = 10, height = 8, dpi = 300)
-}
+# if (interactive()) {
+#   library(ggplot2)
+#   library(patchwork)
+#   prepare_cv_plot = function(x, set = "train") {
+#     x = lapply(x, function(x) data.table(ID = x))
+#     x = rbindlist(x, idcol = "fold")
+#     x[, fold := as.factor(fold)]
+#     x[, set := as.factor(set)]
+#     x[, ID := as.numeric(ID)]
+#   }
+#   plot_cv = function(cv, n = 5) {
+#     # cv = custom_cvs[[1]]
+#     print(cv)
+#     cv_test_inner = cv$inner
+#     cv_test_outer = cv$outer
+#     
+#     # prepare train, tune and test folds
+#     train_sets = cv_test_inner$instance$train[1:n]
+#     train_sets = prepare_cv_plot(train_sets)
+#     tune_sets = cv_test_inner$instance$test[1:n]
+#     tune_sets = prepare_cv_plot(tune_sets, set = "tune")
+#     test_sets = cv_test_outer$instance$test[1:n]
+#     test_sets = prepare_cv_plot(test_sets, set = "test")
+#     dt_vis = rbind(train_sets[seq(1, nrow(train_sets), 10)],
+#                    tune_sets[seq(1, nrow(tune_sets), 5)],
+#                    test_sets[seq(1, nrow(test_sets), 2)])
+#     substr(colnames(dt_vis), 1, 1) = toupper(substr(colnames(dt_vis), 1, 1))
+#     dt_vis[, Set := fcase(
+#       Set == "train", "Trening",
+#       Set == "tune", "Validacija",
+#       Set == "test", "Testiranje"
+#     )]
+#     ggplot(dt_vis, aes(x = Fold, y = ID, color = Set)) +
+#       geom_point() +
+#       theme_minimal() +
+#       theme(legend.title=element_blank()) +
+#       # theme(legend.position = "bottom") +
+#       coord_flip() +
+#       labs(x = "", y = '',
+#            title = paste0("CV-", cv_test_outer$iters))
+#   }
+#   plots = lapply(custom_cvs, plot_cv, n = 50)
+#   wp = wrap_plots(plots) + plot_layout(guides = "collect")
+#   ggsave("plot_cv.png", plot = wp, width = 10, height = 8, dpi = 300)
+# }
 
 
 
@@ -284,10 +297,14 @@ mlr_measures$add("linex", Linex)
 graph_template =
   po("dropnacol", id = "dropnacol", cutoff = 0.05) %>>%
   po("dropna", id = "dropna") %>>%
-  po("removeconstants", id = "removeconstants_1", ratio = 0)  %>>%
+  po("removeconstants", id = "removeconstants_1")  %>>%
   po("fixfactors", id = "fixfactors") %>>%
-  po("winsorizesimple", id = "winsorizesimple", probs_low = 0.01, probs_high = 0.99, na.rm = TRUE) %>>%
-  po("removeconstants", id = "removeconstants_2", ratio = 0)  %>>%
+  po("winsorizesimple", 
+     id = "winsorizesimple", 
+     probs_low = 0.01, 
+     probs_high = 0.99, 
+     na.rm = TRUE) %>>%
+  po("removeconstants", id = "removeconstants_2", ratio = 0.1)  %>>%
   po("dropcorr", id = "dropcorr", cutoff = 0.99) %>>%
   po("uniformization") %>>%
   po("dropna", id = "dropna_v2") %>>%
@@ -296,24 +313,26 @@ graph_template =
               po("filter", filter = flt("relief"), filter.nfeat = 25)
   )) %>>%
   po("unbranch", id = "filter_unbranch") %>>%
-  po("removeconstants", id = "removeconstants_3", ratio = 0)
+  po("removeconstants", id = "removeconstants_3")
 
 # hyperparameters template
 graph_template$param_set
 search_space_template = ps(
   dropcorr.cutoff = p_fct(
-    levels = c("0.80", "0.90", "0.95", "0.99"),
+    levels = c("0.99"), # c("0.80", "0.90", "0.95", "0.99"),
     trafo = function(x, param_set) {
       switch(x,
-             "0.80" = 0.80,
-             "0.90" = 0.90,
-             "0.95" = 0.95,
+             # "0.80" = 0.80,
+             # "0.90" = 0.90,
+             # "0.95" = 0.95,
              "0.99" = 0.99)
     }
   ),
   # dropcorr.cutoff = p_fct(levels = c(0.8, 0.9, 0.95, 0.99)),
-  winsorizesimple.probs_high = p_fct(levels = c(0.999, 0.99, 0.98, 0.97, 0.90, 0.8)),
-  winsorizesimple.probs_low = p_fct(levels = c(0.001, 0.01, 0.02, 0.03, 0.1, 0.2)),
+  # winsorizesimple.probs_high = p_fct(levels = c(0.999, 0.99, 0.98)),
+  # winsorizesimple.probs_low = p_fct(levels = c(0.001, 0.01, 0.02)),
+  winsorizesimple.probs_high = p_fct(levels = c(0.999, 0.99)),
+  winsorizesimple.probs_low = p_fct(levels = c(0.001, 0.01)),
   # scaling
   filter_branch.selection = p_fct(levels = c("jmi", "relief"))
 )
@@ -341,18 +360,18 @@ as.data.table(graph_xgboost$param_set)[grep("depth", id), .(id, class, lower, up
 search_space_xgboost = ps(
   # preprocessing
   dropcorr.cutoff = p_fct(
-    levels = c("0.80", "0.90", "0.95", "0.99"),
+    levels = c("0.95", "0.99"), # c("0.80", "0.90", "0.95", "0.99"),
     trafo = function(x, param_set) {
       switch(x,
-             "0.80" = 0.80,
-             "0.90" = 0.90,
+             # "0.80" = 0.80,
+             # "0.90" = 0.90,
              "0.95" = 0.95,
              "0.99" = 0.99)
     }
   ),
   # dropcorr.cutoff = p_fct(levels = c(0.8, 0.9, 0.95, 0.99)),
-  winsorizesimple.probs_high = p_fct(levels = c(0.999, 0.99, 0.98, 0.97, 0.90, 0.8)),
-  winsorizesimple.probs_low = p_fct(levels = c(0.001, 0.01, 0.02, 0.03, 0.1, 0.2)),
+  winsorizesimple.probs_high = p_fct(levels = c(0.999, 0.99, 0.98)),
+  winsorizesimple.probs_low = p_fct(levels = c(0.001, 0.01, 0.02)),
   # filters
   filter_branch.selection = p_fct(levels = c("jmi", "relief")),
   # learner
@@ -382,23 +401,23 @@ graph_glmnet = as_learner(graph_glmnet)
 as.data.table(graph_glmnet$param_set)[, .(id, class, lower, upper, levels)]
 search_space_glmnet = ps(
   dropcorr.cutoff = p_fct(
-    levels = c("0.80", "0.90", "0.95", "0.99"),
+    levels = c("0.99"), # c("0.80", "0.90", "0.95", "0.99"),
     trafo = function(x, param_set) {
       switch(x,
-             "0.80" = 0.80,
-             "0.90" = 0.90,
-             "0.95" = 0.95,
+             # "0.80" = 0.80,
+             # "0.90" = 0.90,
+             # "0.95" = 0.95,
              "0.99" = 0.99)
     }
   ),
   # dropcorr.cutoff = p_fct(levels = c(0.8, 0.9, 0.95, 0.99)),
-  winsorizesimple.probs_high = p_fct(levels = c(0.999, 0.99, 0.98, 0.97, 0.90, 0.8)),
-  winsorizesimple.probs_low = p_fct(levels = c(0.001, 0.01, 0.02, 0.03, 0.1, 0.2)),
+  winsorizesimple.probs_high = p_fct(levels = c(0.999, 0.99, 0.98)),
+  winsorizesimple.probs_low = p_fct(levels = c(0.001, 0.01, 0.02)),
   # filters
   filter_branch.selection = p_fct(levels = c("jmi", "relief")),
   # learner
   regr.glmnet.s     = p_int(lower = 5, upper = 30),
-  regr.glmnet.alpha = p_dbl(lower = 1e-4, upper = 1, logscale = TRUE)
+  regr.glmnet.alpha = p_dbl(lower = 0.0001, upper = 1, logscale = TRUE)
 )
 
 # threads
@@ -420,17 +439,22 @@ designs_l = lapply(custom_cvs, function(cv_) {
   cv_outer = cv_$outer
   cat("Number of iterations fo cv inner is ", cv_inner$iters, "\n")
   
-  # debug
-  if (interactive()) {
-    ind_ = (cv_inner$iters-1):cv_inner$iters
+  # Choose cv inner indecies we want to use
+  if (LIVE) {
+    # ind_ = (cv_inner$iters-1):cv_inner$iters
+    ind_ = 1:2
   } else {
-    ind_ = 1:cv_inner$iters
+    if (interactive()) {
+      ind_ = (cv_inner$iters-1):cv_inner$iters
+    } else {
+      ind_ = 1:cv_inner$iters
+    }
   }
-  # to_ = cv_inner$iters
+  # ind_ = cv_inner$iters
   
   designs_cv_l = lapply(ind_, function(i) { # 1:cv_inner$iters
     # debug
-    # i = 1
+    # i = 1053
     
     # choose task_
     print(cv_inner$id)
@@ -449,7 +473,7 @@ designs_l = lapply(custom_cvs, function(cv_) {
     # objects for all autotuners
     measure_ = msr("regr.mse")
     tuner_   = tnr("random_search")
-    term_evals = 20
+    term_evals = 2
     
     # auto tuner rf
     at_rf = auto_tuner(
@@ -511,12 +535,97 @@ designs_l = lapply(custom_cvs, function(cv_) {
 })
 designs = do.call(rbind, designs_l)
 
-# exp dir
+# try plain benchmark
+bmr = benchmark(designs[16], store_models = TRUE)
+bmr_dt = as.data.table(bmr)
+bmr_dt$prediction
+bmr_dt$learner[[1]]$state$model$tuning_instance$archive
+bmr_dt$learner[[1]]$state$model$learner$state$model$regr.ranger
+cols_test = bmr_dt$learner[[1]]$state$model$learner$state$model$relief$outtasklayout
+best_params_ = bmr_dt$learner[[1]]$tuning_result
+
+# # test
+# DT[date > (max(date) - 10)][, 1:10]
+# DT[date > (max(date) - 10)][, target]
+# 4780 works
+# 4782 doesnt work
+x = task$data(designs$resampling[[5]]$test_set(1L),
+              cols = c("date", task$feature_names, "target"))
+x[1:15, 1:15]
+any(is.na(x))
+na_cols = x[, colSums(is.na(.SD)), .SDcols = is.numeric]
+na_cols[na_cols > 0]
+na_cols[na_cols > 0] %in% cols_test[, id]
+x[, .(pretty2, returns1008, sdRogerssatchell22, sdYangzhang22, volume1008)]
+x[, target]
+x[, .(tSFEL0FFTMeanCoefficient566)]
+cols = bmr_dt$learner[[1]]$state$model$learner$state$model$relief$outtasklayout[, id]
+y = x[, ..cols]
+# check for consant columns in y
+y = x[, lapply(.SD, function(x) DescTools::Winsorize(x, probs = c(0.01, 0.99), na.rm = TRUE))]
+abs(cor(y)[lower.tri(cor(y))]) >= 0.99
+y[, lapply(.SD, function(x) sd(x))]
+
+bmr_dt$learner[[1]]$state$model$learner$predict_newdata(x)
+
 if (interactive()) {
-  dirname_ = "experiments_test"
+  # show all combinations from search space, like in grid
+  sp_grid = generate_design_grid(search_space_template, 1)
+  sp_grid = sp_grid$data
+  sp_grid
+
+  # check ids of nth cv sets
+  task_ = task$clone()
+  # rows_ = custom_cvs[[1]]$outer$test_set(1L)
+  rows_ = designs$resampling[[5]]$test_set(1L)
+  task_$filter(rows_)
+  gr_test = graph_template$clone()
+  # gr_test$param_set$values$filter_target_branch.selection = fb_
+  # gr_test$param_set$values$filter_target_id.q = 0.3
+  system.time({res = gr_test$train(task_)})
+  res$removeconstants_3.output$data()
+}
+graph_template_2 =
+  po("dropnacol", id = "dropnacol", cutoff = 0.05) %>>%
+  po("dropna", id = "dropna") %>>%
+  po("removeconstants", id = "removeconstants_1", ratio = 0)  %>>%
+  po("fixfactors", id = "fixfactors") %>>%
+  po("winsorizesimple", 
+     id = "winsorizesimple", 
+     probs_low = as.numeric(best_params_$winsorizesimple.probs_low), 
+     probs_high = as.numeric(best_params_$winsorizesimple.probs_high), 
+     na.rm = TRUE) %>>%
+  po("removeconstants", id = "removeconstants_2", ratio = 0)  %>>%
+  po("dropcorr", id = "dropcorr", cutoff = as.numeric(best_params_$dropcorr.cutoff)) %>>%
+  po("uniformization") %>>%
+  po("dropna", id = "dropna_v2") %>>%
+  # po("branch", options = c("jmi", "relief"), id = "filter_branch") %>>%
+  # gunion(list(po("filter", filter = flt("jmi"), filter.nfeat = 25),
+  #             po("filter", filter = flt("relief"), filter.nfeat = 25)
+  # )) %>>%
+  # po("unbranch", id = "filter_unbranch") %>>%
+  po("removeconstants", id = "removeconstants_3")
+task_ = task$clone()
+rows_ = designs$resampling[[5]]$test_set(1L)
+task_$filter(rows_)
+res = graph_template_2$train(task_)
+dtt = res$removeconstants_3.output$data()
+dtt[, 1:5]
+dtt[, ..cols]
+cols %in% colnames(res$removeconstants_3.output$data())
+cols[cols %notin% colnames(res$removeconstants_3.output$data())]
+
+# exp dir
+if (LIVE) {
+  dirname_ = "experiments_live"
   if (dir.exists(dirname_)) system(paste0("rm -r ", dirname_))
 } else {
-  dirname_ = "experiments"
+  if (interactive()) {
+    dirname_ = "experiments_test"
+    if (dir.exists(dirname_)) system(paste0("rm -r ", dirname_))
+  } else {
+    dirname_ = "experiments"
+  }
 }
 
 # create registry
@@ -530,12 +639,31 @@ reg = makeExperimentRegistry(file.dir = dirname_, seed = 1, packages = packages)
 print("Batchmark")
 batchmark(designs, reg = reg, store_models = FALSE)
 
-# save registry
-print("Save registry")
-saveRegistry(reg = reg)
-
 # create sh file
-sh_file = sprintf("
+if (LIVE) {
+  # load registry
+  # reg = loadRegistry("experiments_live", writeable = TRUE)
+  # test 1 job
+  result = testJob(1, external = TRUE, reg = reg)
+  
+  # get nondone jobs
+  ids = findNotDone(reg = reg)
+  
+  # set up cluster (for local it is parallel)
+  cf = makeClusterFunctionsSocket(ncpus = 8L)
+  reg$cluster.functions = cf
+  saveRegistry(reg = reg)
+  
+  # define resources and submit jobs
+  resources = list(ncpus = 2, memory = 8000)
+  submitJobs(ids = ids$job.id, resources = resources, reg = reg)
+} else {
+  # save registry
+  print("Save registry")
+  saveRegistry(reg = reg)
+  
+  sh_file = sprintf(
+    "
 #!/bin/bash
 
 #PBS -N ZSEML
@@ -547,8 +675,10 @@ sh_file = sprintf("
 
 cd ${PBS_O_WORKDIR}
 apptainer run image.sif run_job.R 0
-", nrow(designs))
-sh_file_name = "run_jobs.sh"
-file.create(sh_file_name)
-writeLines(sh_file, sh_file_name)
-
+",
+    nrow(designs)
+  )
+  sh_file_name = "run_jobs.sh"
+  file.create(sh_file_name)
+  writeLines(sh_file, sh_file_name)
+}

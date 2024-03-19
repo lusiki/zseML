@@ -6,7 +6,6 @@ library(matrixStats)
 
 
 
-
 # SETUP -------------------------------------------------------------------
 # help functions
 sign01 = function(x) {

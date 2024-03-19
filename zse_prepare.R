@@ -13,20 +13,10 @@ library(reticulate)
 library(lubridate)
 library(AzureStor)
 library(PerformanceAnalytics)
-# Python environment and python modules
-# Instructions: some functions use python modules. Steps to use python include:
-# 1. create new conda environment:
-#    https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
-#    Choose python 3.8. for example:
-#    conda create -n mlfinlabenv python=3.8
-# 2. Install following packages inside environments
-#    mlfinlab
-#    tsfresh
-#    TSFEL
+library(fs)
+
 # python packages
-reticulate::use_python("C:/Users/Mislav/.conda/envs/mlfinlabenv/python.exe", required = TRUE)
-# # mlfinlab = reticulate::import("mlfinlab", convert = FALSE)
-# pd = reticulate::import("pandas", convert = FALSE)
+use_virtualenv("C:/Users/Mislav/projects_py/pyquant", required = TRUE)
 builtins = import_builtins(convert = FALSE)
 main = import_main(convert = FALSE)
 tsfel = reticulate::import("tsfel", convert = FALSE)
@@ -35,10 +25,9 @@ warnigns = reticulate::import("warnings", convert = FALSE)
 warnigns$filterwarnings('ignore')
 
 
-
 # SET UP ------------------------------------------------------------------
 # paths
-PATH_PREDICTORS = "F:/zse/predictors/monthly"
+PATH_PREDICTORS = "F:/zse/predictors/weekly"
 
 
 # DATA --------------------------------------------------------------------
@@ -61,33 +50,33 @@ prices = prices[open > 1e-008 & high > 1e-008 & low > 1e-008 & close > 1e-008]
 isin_keep = prices[, .N, isin][N >= 2 * 252, isin]
 prices = prices[isin %chin% isin_keep]
 
-# missing values
+# Missing values
 prices[is.na(close), close := average]
 
-# sort
+# Sort
 setorder(prices, isin, date)
 
-# add monthly column
+# Add monthly column
 prices[, date := as.IDate(date)]
 prices[, week := ceiling_date(date, unit = "week") - 1]
 
-# test if week is fine
-prices[week >= date]
+# Test if week is fine
+prices[, all(week >= date)]
 
-# create a column last_month_day that will be equal to TRUE if date is last day of the month
+# Create a column last_month_day that will be equal to TRUE if date is last day of the month
 prices[, last_week_day := last(date, 1) == date, by = c("isin", "week")]
 
-# check if last_week_day works as expected
+# Check if last_week_day works as expected
 isin_ = "HRHT00RA0005"
 prices[isin == isin_, .(isin, date, close, week, last_week_day)][1:99]
 tail(prices[isin == isin_, .(isin, date, close, week, last_week_day)], 100)
 
-# plot one stock
+# Plot one stock
 data_plot = as.xts.data.table(prices[isin == isin_, .(date, close)])
 plot(data_plot, main = isin_)
 
 #  remove symbols with low number of observations
-threshold = 0.7
+threshold = 0.6
 monnb = function(d) { lt = as.POSIXlt(as.Date(d, origin="1900-01-01")); lt$year*52 + lt$mon*4 }
 mondf = function(d1, d2) { as.integer(monnb(d2) - monnb(d1)) }
 diff_in_weeks = prices[, .(monthdiff = mondf(min(date), max(date))), by = "isin"]
@@ -135,77 +124,229 @@ summary_returns
 # Ohlcv feaures
 OhlcvInstance = Ohlcv$new(prices, id_col = "isin", date_col = "date")
 
-# rolling parameters
-at_ = which(OhlcvInstance$X[, .(last_week_day)][[1]])
-which(is.na(OhlcvInstance$X[at_, close]))
-which(is.na(OhlcvInstance$X[at_, returns]))
+# Define lag parameter
 lag_ = 0L
 
-# Exuber
-RollingExuberInit = RollingExuber$new(windows = c(125, 250, 500),
-                                      workers = 4L,
-                                      at = at_,
-                                      lag = lag_,
-                                      exuber_lag = 1L)
-RollingExuberFeatures = RollingExuberInit$get_rolling_features(OhlcvInstance$clone(), TRUE)
+# Util function that returns most recently saved predictor object
+get_latest = function(predictors) {
+  # predictors = "RollingExuberFeatures"
+  # predictors = "PreRollingBidAskFeatures"
+  # dir_ls(gsub("/$", "", PATH_PREDICTORS), regexp = paste0("(^", predictors, ".*)"))
+  f = file.info(dir_ls(PATH_PREDICTORS, regexp = paste0(".*/", predictors)))
+  if (length(f) == 0) {
+    print(paste0("There is no file with ", predictors))
+    return(NULL)
+  }
+  latest = tail(f[order(f$ctime), ], 1)
+  row.names(latest)
+}
 
+# Help function to import existing data
+f_fread = function(x) tryCatch(fread(get_latest(x)), error = function(e) NULL)
 
-# Forecast Features
-RollingForecatsInstance = RollingForecats$new(windows = c(500),
-                                              workers = 4L,
-                                              lag = lag_, 
-                                              at = at_,
-                                              forecast_type = c("autoarima", "nnetar", "ets"),
-                                              h = 22)
-RollingForecatsFeatures = RollingForecatsInstance$get_rolling_features(OhlcvInstance$clone())
+# Import existing data based on strategy
+RollingBackCusumFeatures    = f_fread("RollingBackCusumFeatures")
+RollingExuberFeatures       = f_fread("RollingExuberFeatures")
+RollingForecatsFeatures     = f_fread("RollingForecatsFeatures")
+RollingGpdFeatures          = f_fread("RollingGpdFeatures")
+RollingTheftCatch22Features = f_fread("RollingTheftCatch22Features")
+RollingTheftTsfelFeatures   = f_fread("RollingTheftTsfelFeatures")
+RollingTsfeaturesFeatures   = f_fread("RollingTsfeaturesFeatures")
+RollingWaveletArimaFeatures = f_fread("RollingWaveletArimaFeatures")
+RollingFracdiffFeatures     = f_fread("RollingFracdiffFeatures")
+
+# Util function for identifying missing dates and create at_ object
+get_at_ = function(predictors) {
+  # debug
+  # predictors = copy(RollingBackCusumFeatures)
+  # predictors = NULL
+
+  if (is.null(predictors)) {
+    at_ = OhlcvInstance$X[, which(last_week_day == TRUE)]
+  } else {
+    # get only new data
+    new_dataset = fsetdiff(OhlcvInstance$X[last_week_day == TRUE, 
+                                           .(symbol, date = as.IDate(date))],
+                           predictors[, .(symbol, date)])
+    if (nrow(new_dataset) == 0) {
+      print("No new data.")
+      return(NULL)
+    }
+    at_ = new_dataset[, index := 1][OhlcvInstance$X, on = c("symbol", "date")]
+    at_ = at_[, which(last_week_day == TRUE & index == 1)]
+  }
+  at_
+}
+
+# Help function to create file name
+create_file_name = function(name, pre = FALSE) {
+  time_ = format.POSIXct(Sys.time(), format = "%Y%m%d%H%M%S")
+  file_ = paste0(name, "-", time_, ".csv")
+  file_ = path(PATH_PREDICTORS, file_)
+  return(file_)
+}
+
+# Help function for number of workers
+get_workers = function(at_) if (length(at_) < 50) 1L else 6L
 
 # BackCUSUM features
-RollingBackcusumInit = RollingBackcusum$new(windows = c(66, 125), 
-                                            workers = 4L,
-                                            at = at_, 
-                                            lag = lag_,
-                                            alternative = c("greater", "two.sided"),
-                                            return_power = c(1, 2))
-RollingBackCusumFeatures = RollingBackcusumInit$get_rolling_features(OhlcvInstance$clone())
+print("Calculate BackCUSUM features.")
+at_ = get_at_(RollingBackCusumFeatures)
+if (length(at_) > 0) {
+  RollingBackcusumInit = RollingBackcusum$new(
+    windows = c(66, 125),
+    workers = if (length(at_) < 50) 1L else 4L,
+    at = at_,
+    lag = lag_,
+    alternative = c("greater", "two.sided"),
+    return_power = c(1, 2)
+  )
+  RollingBackCusumFeatures_new = RollingBackcusumInit$get_rolling_features(OhlcvInstance)
+  
+  # merge and save
+  RollingBackCusumFeatures_new[, date := as.IDate(date)]
+  RollingBackCusumFeatures_new_merged = rbind(RollingBackCusumFeatures, RollingBackCusumFeatures_new)
+  fwrite(RollingBackCusumFeatures_new_merged, create_file_name("RollingBackCusumFeatures"))
+}
 
-# theft features
-RollingTheftInit = RollingTheft$new(windows = c(22, 66, 250),
-                                    workers = 6L, 
-                                    at = at_, 
-                                    lag = lag_,
-                                    features_set = c("catch22", "feasts"))
-RollingTheftCatch22Features = RollingTheftInit$get_rolling_features(OhlcvInstance$clone())
+# Exuber features
+print("Calculate Exuber features.")
+at_ = get_at_(RollingExuberFeatures)
+if (length(at_) > 0) {
+  RollingExuberInit = RollingExuber$new(
+    windows = c(125, 250, 500),
+    workers = get_workers(at_),
+    at = at_,
+    lag = lag_,
+    exuber_lag = 1L
+  )
+  RollingExuberFeaturesNew = RollingExuberInit$get_rolling_features(OhlcvInstance, TRUE)
+  
+  # merge and save
+  RollingExuberFeaturesNew[, date := as.IDate(date)]
+  RollingExuberFeatures_new_merged = rbind(RollingExuberFeatures, RollingExuberFeaturesNew)
+  fwrite(RollingExuberFeatures_new_merged, create_file_name("RollingExuberFeatures"))
+}
 
+# Forecast Features
+print("Calculate AutoArima features.")
+at_ = get_at_(RollingForecatsFeatures)
+if (length(at_) > 0) {
+  RollingForecatsInstance = RollingForecats$new(
+    windows = 500,
+    workers = get_workers(at_),
+    lag = lag_,
+    at = at_,
+    forecast_type = c("autoarima", "nnetar", "ets"),
+    h = 22
+  )
+  RollingForecatsFeaturesNew = RollingForecatsInstance$get_rolling_features(OhlcvInstance)
+  
+  # merge and save
+  RollingForecatsFeaturesNew[, date := as.IDate(date)]
+  RollingForecatsFeaturesNewMerged = rbind(RollingForecatsFeatures, RollingForecatsFeaturesNew)
+  fwrite(RollingForecatsFeaturesNewMerged, create_file_name("RollingForecatsFeatures"))
+}
+
+# Theft catch22 features
+print("Calculate Catch22 and feasts features.")
+at_ = get_at_(RollingTheftCatch22Features)
+if (length(at_) > 0) {
+  RollingTheftInit = RollingTheft$new(
+    windows = c(22, 66, 250),
+    workers = get_workers(at_),
+    at = at_,
+    lag = lag_,
+    features_set = c("catch22", "feasts")
+  )
+  RollingTheftCatch22FeaturesNew = RollingTheftInit$get_rolling_features(OhlcvInstance)
+  
+  # save
+  RollingTheftCatch22FeaturesNew[, date := as.IDate(date)]
+  # RollingTheftCatch22FeaturesNew[, c("feasts____22_5", "feasts____25_22") := NULL]
+  RollingTheftCatch22FeaturesNewMerged = rbind(RollingTheftCatch22Features, 
+                                               RollingTheftCatch22FeaturesNew, fill = TRUE)
+  fwrite(RollingTheftCatch22FeaturesNewMerged, create_file_name("RollingTheftCatch22Features"))
+}
+
+# Tsfeatures features
 # Error in checkForRemoteErrors(val) : 
 #   one node produced an error: ℹ In index: 1.
 # Caused by error in `outlierinclude_mdrmd()`:
 #   ! The time series is a constant!
 # # tsfeatures features
 # FOR 66 WINDOW
-RollingTsfeaturesInit = RollingTsfeatures$new(windows = c(125, 250),
-                                              workers = 6L,
-                                              at = at_,
-                                              lag = lag_,
-                                              scale = TRUE)
-RollingTsfeaturesFeatures = RollingTsfeaturesInit$get_rolling_features(OhlcvInstance$clone())
+print("Calculate tsfeatures features.")
+at_ = get_at_(RollingTsfeaturesFeatures)
+if (length(at_) > 0) {
+  RollingTsfeaturesInit = RollingTsfeatures$new(
+    windows = c(250),
+    workers = get_workers(at_),
+    at = at_,
+    lag = lag_,
+    scale = TRUE
+  )
+  RollingTsfeaturesFeaturesNew = RollingTsfeaturesInit$get_rolling_features(OhlcvInstance)
+  
+  # save
+  RollingTsfeaturesFeaturesNew[, date := as.IDate(date)]
+  RollingTsfeaturesFeaturesNewMerged = rbind(RollingTsfeaturesFeatures, 
+                                             RollingTsfeaturesFeaturesNew, fill = TRUE)
+  fwrite(RollingTsfeaturesFeaturesNewMerged, create_file_name("RollingTsfeaturesFeatures"))
+}
 
-# theft
-RollingTheftInit = RollingTheft$new(windows = c(66, 250), 
-                                    workers = 1L,
-                                    at = at_, 
-                                    lag = lag_,  
-                                    features_set = "TSFEL")
-RollingTheftTsfelFeatures = suppressMessages(RollingTheftInit$get_rolling_features(OhlcvInstance$clone()))
+# theft tsfel features, Must be alone, because number of workers have to be 1L
+print("Calculate tsfel features.")
+at_ = get_at_(RollingTheftTsfelFeatures)
+if (length(at_) > 0) {
+  RollingTheftInit = RollingTheft$new(
+    windows = c(88, 250),
+    workers = get_workers(at_),
+    at = at_,
+    lag = lag_,
+    features_set = "TSFEL"
+  )
+  RollingTheftTsfelFeaturesNew = suppressMessages(RollingTheftInit$get_rolling_features(OhlcvInstance))
+  
+  # save
+  RollingTheftTsfelFeaturesNew[, date := as.IDate(date)]
+  RollingTheftTsfelFeaturesNewMerged = rbind(RollingTheftTsfelFeatures, 
+                                             RollingTheftTsfelFeaturesNew) # , fill = TRUE
+  fwrite(RollingTheftTsfelFeaturesNewMerged, create_file_name("RollingTheftTsfelFeatures"))
+}
 
 # Wavelet arima
-RollingWaveletArimaInstance = RollingWaveletArima$new(windows = 250, 
-                                                      workers = 6L,
-                                                      lag = lag_, 
-                                                      at = at_, 
-                                                      filter = "haar")
-RollingWaveletArimaFeatures = RollingWaveletArimaInstance$get_rolling_features(OhlcvInstance$clone())
+print("Wavelet predictors")
+at_ = get_at_(RollingWaveletArimaFeatures)
+if (length(at_) > 0) {
+  RollingWaveletArimaInstance = RollingWaveletArima$new(
+    windows = 250,
+    workers = get_workers(at_),
+    lag = lag_,
+    at = at_,
+    filter = "haar"
+  )
+  RollingWaveletArimaFeaturesNew = RollingWaveletArimaInstance$get_rolling_features(OhlcvInstance)
+  
+  # save
+  RollingWaveletArimaFeaturesNew[, date := as.IDate(date)]
+  RollingWaveletArimaFeaturesNewMerged = rbind(RollingWaveletArimaFeatures, 
+                                               RollingWaveletArimaFeaturesNew) # , fill = TRUE
+  fwrite(RollingWaveletArimaFeaturesNewMerged, create_file_name("RollingWaveletArimaFeatures"))
+}
 
-# merge all features test
+# Import existing data based on strategy
+RollingBackCusumFeatures    = f_fread("RollingBackCusumFeatures")
+RollingExuberFeatures       = f_fread("RollingExuberFeatures")
+RollingForecatsFeatures     = f_fread("RollingForecatsFeatures")
+RollingGpdFeatures          = f_fread("RollingGpdFeatures")
+RollingTheftCatch22Features = f_fread("RollingTheftCatch22Features")
+RollingTheftTsfelFeatures   = f_fread("RollingTheftTsfelFeatures")
+RollingTsfeaturesFeatures   = f_fread("RollingTsfeaturesFeatures")
+RollingWaveletArimaFeatures = f_fread("RollingWaveletArimaFeatures")
+RollingFracdiffFeatures     = f_fread("RollingFracdiffFeatures")
+
+# Merge all features test
 rolling_predictors = Reduce(
   function(x, y) merge( x, y, by = c("symbol", "date"), all.x = TRUE, all.y = FALSE),
   list(
@@ -220,6 +361,7 @@ rolling_predictors = Reduce(
 )
 
 # Features from OHLLCV
+at_ = get_at_(NULL)
 OhlcvFeaturesInit = OhlcvFeaturesDaily$new(at = NULL,
                                            windows = c(22, 66, 125, 250, 500),
                                            quantile_divergence_window =  c(22, 66, 125, 250, 500))
@@ -233,7 +375,7 @@ OhlcvFeaturesSetSample[symbol == isin_, .(symbol, date_ohlcv = date)]
 rolling_predictors[symbol == isin_, .(symbol, date_rolling = date)]
 # Seems good!
 
-# merge all predictors
+# Merge all predictors
 rolling_predictors[, date_rolling := date]
 OhlcvFeaturesSetSample[, date_ohlcv := date]
 features = rolling_predictors[OhlcvFeaturesSetSample, on=c("symbol", "date"), roll = -Inf]
@@ -243,25 +385,25 @@ features[symbol == isin_, .(symbol, date_rolling, date_ohlcv, date)]
 features[, max(date)]
 
 # check for duplicates
-features[duplicated(features[, .(symbol, date)]), .(symbol, date)]
-features[duplicated(features[, .(symbol, date_ohlcv)]), .(symbol, date_ohlcv)]
-features[duplicated(features[, .(symbol, date_rolling)]), .(symbol, date_rolling)]
-features[duplicated(features[, .(symbol, date_rolling)]) | duplicated(features[, .(symbol, date_rolling)], fromLast = TRUE),
-         .(symbol, date, date_ohlcv, date_rolling)]
-features = unique(features, by = c("symbol", "date_rolling"))
+anyDuplicated(features, by = c("symbol", "date"))
+anyDuplicated(features, by = c("symbol", "date_rolling"))
+anyDuplicated(features, by = c("symbol", "date_ohlcv"))
+if (anyDuplicated(features, by = c("symbol", "date_rolling"))) {
+  features = unique(features, by = c("symbol", "date_rolling")) 
+}
 
-# merge predictors and weekly prices
-any(duplicated(prices[, .(isin, date)]))
-any(duplicated(features[, .(symbol, date_rolling)]))
+# Merge predictors and weekly prices
+anyDuplicated(features, by = c("symbol", "date"))
+anyDuplicated(features, by = c("symbol", "date_rolling"))
 features[, .(symbol, date_rolling, date_ohlcv, date)]
 prices[last_week_day == TRUE, .(isin, date, week)]
 dt = merge(features, prices[last_week_day == TRUE, .(isin, date)],
            by.x = c("symbol", "date_rolling"), by.y = c("isin", "date"),
            all.x = TRUE, all.y = FALSE)
 dt[, .(symbol, date, date_rolling, date_ohlcv, week)]
-dt[duplicated(dt[, .(symbol, date)]), .(symbol, date)]
-dt[duplicated(dt[, .(symbol, date_ohlcv)]), .(symbol, date_ohlcv)]
-dt[duplicated(dt[, .(symbol, date_rolling)]), .(symbol, date_rolling)]
+anyDuplicated(dt, by = c("symbol", "date"))
+anyDuplicated(dt, by = c("symbol", "date_ohlcv"))
+anyDuplicated(dt, by = c("symbol", "date_rolling"))
 
 # remove missing ohlcv
 dt = dt[!is.na(date_ohlcv)]
@@ -271,8 +413,8 @@ dt = dt[!is.na(date_ohlcv)]
 # features space from features raw
 cols_remove = c("date_ohlcv", "last_week_day") # duplicate with date_ohlcv
 str(dt[, 1100:ncol(dt)])
-cols_non_features <- c("symbol", "date", "date_rolling", "week",
-                       "open", "high", "low", "close","volume", "returns")
+cols_non_features = c("symbol", "date", "date_rolling", "week",
+                      "open", "high", "low", "close","volume", "returns")
 cols_predictors = setdiff(colnames(dt), c(cols_remove, cols_non_features))
 head(cols_predictors, 10)
 tail(cols_predictors, 500)
@@ -283,11 +425,11 @@ dt = dt[, .SD, .SDcols = cols]
 # CLEAN DATA --------------------------------------------------------------
 # remove duplicates
 clf_data = copy(dt)
-if (any(duplicated(clf_data[, .(symbol, date)]))) {
+if (anyDuplicated(clf_data, by = c("symbol", "date")) > 0) {
   clf_data = unique(clf_data, by = c("symbol", "date"))
 }
 
-# remove columns with many NA
+# Remove columns with many NA
 keep_cols = names(which(colMeans(!is.na(clf_data)) > 0.5))
 print(paste0("Removing columns with many NA values: ", setdiff(colnames(clf_data), c(keep_cols, "right_time"))))
 if (length(setdiff(colnames(clf_data), c(keep_cols, "right_time"))) > 0) {
@@ -302,17 +444,26 @@ if (length(setdiff(colnames(clf_data), keep_cols)) > 0) {
   clf_data = clf_data[, .SD, .SDcols = keep_cols]
 }
 
-# remove inf values
-n_0 <- nrow(clf_data)
-clf_data <- clf_data[is.finite(rowSums(clf_data[, .SD, .SDcols = is.numeric], na.rm = TRUE))]
-n_1 <- nrow(clf_data)
+# Remove inf values
+n_0 = nrow(clf_data)
+clf_data = clf_data[is.finite(rowSums(clf_data[, .SD, .SDcols = is.numeric], na.rm = TRUE))]
+n_1 = nrow(clf_data)
 print(paste0("Removing ", n_0 - n_1, " rows because of Inf values"))
 
-# final checks
+# Final checks
 clf_data[, .(symbol, date, date_rolling)]
 dt[, .(symbol, date, date_rolling)]
 dt[, max(date)]
 clf_data[, max(date)]
+
+########## I THINK I DONT NEED THIS ANYMORE ##########
+# # Merge old and new data
+# clf_data_old = fread(files_[last_date_ind])
+# print(paste0("Columns miusmatch between old and new data: ", 
+#              setdiff(colnames(clf_data_old), colnames(clf_data))))
+# clf_data[, week := as.IDate(week)]
+# clf_data_new = rbindlist(list(clf_data_old, clf_data), fill = TRUE)
+########## I THINK I DONT NEED THIS ANYMORE ##########
 
 # save predictors
 last_date = strftime(clf_data[, max(date)], "%Y%m%d")
@@ -321,10 +472,26 @@ file_name_local = fs::path("data", file_name)
 fwrite(clf_data, file_name_local)
 
 # Save to Azure blob
-# file_name = "zse-predictors-20240117.csv"
-# clf_data = fread(file.path("data", file_name))
 endpoint = "https://snpmarketdata.blob.core.windows.net/"
 blob_key = readLines('./blob_key.txt')
 BLOBENDPOINT = storage_endpoint(endpoint, key=blob_key)
 cont = storage_container(BLOBENDPOINT, "jphd")
 storage_write_csv(clf_data, cont, file_name)
+
+
+
+# ARCHIVE -----------------------------------------------------------------
+# Get last date predictors were generated
+# files_ = list.files("./data",
+#                     pattern = "zse-predictors-\\d{8}\\.csv",
+#                     full.names = TRUE)
+# last_date = as.Date(gsub("\\.csv|.*-", "", files_), format = "%Y%m%d")
+# last_date_ind = which.max(last_date)
+# last_date = last_date[last_date_ind]
+
+# rolling parameters
+# week_id = OhlcvInstance$X[, which(last_week_day == TRUE)]
+# date_id = OhlcvInstance$X[, which(date > last_date)]
+# at_ = base::intersect(week_id, date_id)
+# OhlcvInstance$X[at_]
+# lag_ = 0L

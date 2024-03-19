@@ -1,0 +1,745 @@
+---
+title: "Primjena modela strojnog učenja za predviđanje očekivanih prinosa dioncia U RH"
+author: "Mislav Sagovac"
+date: last-modified
+format: 
+  docx:
+    toc: false
+    number-sections: true
+    highlight-style: github
+execute:
+  echo: false
+  warning: false
+editor: visual
+bibliography: reference.bib
+---
+
+```{r}
+library(data.table)
+library(fs)
+library(lubridate)
+library(flextable)
+library(ggplot2)
+library(PerformanceAnalytics)
+library(mlr3batchmark)
+library(matrixStats)
+library(mlr3misc)
+
+# setup
+set_flextable_defaults(
+  decimal.mark = ",",
+  big.mark = ".",
+  digits = 2,
+  width = 1,
+  layout = "autofit"
+)
+gg_theme = theme(axis.title.x = element_blank())
+PATH = "F:/zse/results_week"
+TYPE = "predictions" # can be predictions and models
+TARGETS = "target"
+```
+
+```{r}
+#| cache: true
+#| include: false
+
+# import prices
+prices = fread("F:/zse/prices.csv")
+
+# remove column change
+prices[, change := NULL]
+
+# keep only data after 1999
+prices = prices[date >= "2000-01-01"]
+
+# remove duplicates
+prices = unique(prices, by = c("isin", "date"))
+
+# remove observations where open, high, low, close columns are below 1e-008
+prices = prices[open > 1e-008 & high > 1e-008 & low > 1e-008 & close > 1e-008]
+
+# keep only isin with at least 2 years of data
+isin_keep = prices[, .N, isin][N >= 2 * 252, isin]
+prices = prices[isin %chin% isin_keep]
+
+# missing values
+prices[is.na(close), close := average]
+
+# sort
+setorder(prices, isin, date)
+
+# add monthly column
+prices[, date := as.IDate(date)]
+prices[, week := ceiling_date(date, unit = "week") - 1]
+
+# test if week is fine
+prices[week >= date]
+
+# create a column last_month_day that will be equal to TRUE if date is last day of the month
+prices[, last_week_day := last(date, 1) == date, by = c("isin", "week")]
+
+# check if last_week_day works as expected
+isin_ = "HRHT00RA0005"
+prices[isin == isin_, .(isin, date, close, week, last_week_day)][1:99]
+tail(prices[isin == isin_, .(isin, date, close, week, last_week_day)], 100)
+
+# plot one stock
+data_plot = as.xts.data.table(prices[isin == isin_, .(date, close)])
+plot(data_plot, main = isin_)
+
+#  remove symbols with low number of observations
+threshold = 0.7
+monnb = function(d) { lt = as.POSIXlt(as.Date(d, origin="1900-01-01")); lt$year*52 + lt$mon*4 }
+mondf = function(d1, d2) { as.integer(monnb(d2) - monnb(d1)) }
+diff_in_weeks = prices[, .(monthdiff = mondf(min(date), max(date))), by = "isin"]
+diff_in_weeks[, table(monthdiff)]
+symbols_keep = prices[last_week_day == TRUE][
+  , .(weeks_ = as.integer(.N)), by = isin][
+    diff_in_weeks[, .(isin, monthdiff)], on = "isin"]
+symbols_keep[, keep := weeks_ / monthdiff]
+hist(symbols_keep[, keep])
+symbols_keep[keep > threshold]
+prices = prices[isin %chin% symbols_keep[keep > threshold, isin]]
+
+```
+
+```{r}
+# Inline code varaibles
+n = format(nrow(prices), big.mark = ".")
+first_date = strftime(prices[, min(date)], format = "%d.%m.%Y.")
+last_date = strftime(prices[, max(date)], format = "%d.%m.%Y.")
+
+```
+
+# Uvod
+
+Široka primjena modela strojnog učenja nije zaobišla područje investiranja i trgovanja dionicama. Sposobnost modela strojnog učenja da obrade velike skupove podataka i otkriju složene, nelinearne obrasce ponašanja učinila ih je korisnim alatima za investitore i istraživače. Ovaj rad istražuje primjenu modela strojnog učenja za predviđanje očekivanih prinosa dionica u Hrvatskoj, koristeći trgovinske podatke s Zagrebačke burze (ZSE) od 2000. do 2024. Večina istraživanja ovog tipa primjenjena su na razvijena tržišta kapitala. Budući daje hrvatsko trćište kapitala relativno nelikvidno i plitko, moguće je da modeli strojnog učenja pokazuju veću učinkovitost u predviđanju budućih povrata u dnosu na iste modele primjenjene na razvijenim tržištima kapitala. Drugim riječima, zbog većog stupnja nesavršenosti na hrvatskom tržištu kapitala, modeli strojnog učenja mogu potencijalno prepoznavati obrasce koji postoje duže nego na razvijenim tržištima.
+
+Osim primjene metodolgije temeljene na strojnom učenju na malo, plitko tržište, ovo istraživanje uvodi i nove prediktore u funkciju predviđanja. Koristi se veliki skup prediktora izvedenih iz dnevnih podataka o trgovanju, za sve dionice koje su kotirale na Zagrebačkoj burzi. Skup podataka podvrgava se rigoroznoj predobradi kako bi se osigurala njegova prikladnost za modele strojnog učenja. Takva pomna priprema podataka ključna je za pouzdanost predikcija strojnog učenja @Pavlidis2016. Novost je i primjena drugačijih metoda filtrianja prediktora, u odnosu na metode koje se koriste u drugim radovima. Koriste se dvije metode filtrianja. Prva metoda, JMI, je bazirana na filtriranju zajedničkih informacija. Druga metoda, relief, je bazirana na informacijskoj entropiji (@Kononenko1994). Ove metode filtriranja prediktora su odabrane jer su pokazale visoku učinkovitost u smanjenju dimenzionalnosti podataka, a time i povećanju učinkovitosti modela strojnog učenja (@Pavlidis2016).
+
+Primjena strojnog učenja je novo, ali brzorastućo područje investicijske analize. Lopez de Prado [@lopezdeprado2018] naglašava ključnu ulogu strojnog učenja u modernim financijama. U svojoj široko poznatoj knjizi, pruža broje savjete za praktičnu primjenu financijskog strojnog učenja, od pripreme i filtriranja podataka, opzimizacije modela do backtestinga.
+
+Nadalje, "Predviđanje tržišta dionica korištenjem strojnog učenja" [@stockmarketpredictionML] istražuje primjenu algoritama strojnog učenja za prognoziranje cijena dionica, dodatno učvršćujući važnost tehnika temeljenih na podacima u financijskoj analizi.
+
+Rad Hestona i Sinhe [@hestonsinha] istražuje prediktivnu moć sentimenta vijesti o povratima dionica, otkrivajući vremensku dinamiku utjecaja vijesti, što se izravno usklađuje s fokusom na razumijevanje utjecaja vanjskih informacija na financijska tržišta. Osim toga, nalazi Shaikha i sur. [@shaikhetal] otkrivaju potencijal korištenja strojnog učenja za predviđanje kretanja tržišta dionica, naglašavajući rastući interes za korištenje naprednih računalnih tehnika za financijsko prognoziranje.
+
+Rezultati pokazuju da modeli strojnog učenja imaju visoku učinkovitost u predviđanju očekivanih prinosa dionica na Zagrebačkoj burzi. Pritome postoji velik razlika u uspješnosti modela. Modeli stabla odlučivanja i slučajnih šuma pokazuju veću učinkovitost od penalizirajučih regresijskih modela i neuronskih mreža. Ansambli modela (medijan i prosjek predikcija) pokazuju bolje rezultate od pojedinačnih modela. Osim toga, rezultati pokazuju da su novi prediktori, koji su konstruirani na temelju dnevnih podataka o trgovanju, ključni za postizanje visoke učinkovitosti modela strojnog učenja.
+
+Rezultati ovog istraživanja mogu biti korisni za investitore, ali i za regulatorna tijela koja nadziru tržište kapitala. Investitori bi mogli koristiti rezultate ovog istraživanja za donošenje investicijskih odluka, dok bi regulatorna tijela mogla koristiti rezultate za nadzor tržišta kapitala. Osim toga, rezultati ovog istraživanja mogli bi biti korisni i za istraživače koji se bave primjenom modela strojnog učenja u financijama. Ovo istraživanje može poslužiti kao polazna točka za daljnja istraživanja koja se bave primjenom modela strojnog učenja na malim, plitkim tržištima kapitala.
+
+# Podaci
+
+## Opis podataka i prediktora
+
+U analizi se koriste trgovinski podaci za sve dionice koje su kotirale na Zagrebačkoj burzi od njezinog osnutka. Podaci su preuzeti sa službenih web stranica Zagrebačke burze. Budući da je u početku tržište kapitala bilo izrazito plitko, te je na burzi kotiralo svega nekoliko kompanija, početno razdoblje uzorka je pomaknuto na 2000. godinu. Podaci dakle uključuju trgovinske podatke od `r first_date` godine do `r last_date`.
+
+Na podacima su poduzeti uobičajeni postupci čiščenja podataka:
+
+-   eliminirane su sve duple vrijednosti. Drugim riječima, simbol (ISIN) i datum moraju biti unikatni kroz cijeli uzorak.
+-   eliminirane su sve opservacije gdje je cijena potencijalno manja od 1e-008.
+-   u uzorku su ostavljeni samo simboli koji imaju najmanje 2 godine podataka. Ovaj uvjet je nužan jer se kod računanja prediktora koriste dugački prozori.
+-   nedostajuće vrijednosti za zadnje cijene su zamjenjene prosječnim vrijednostima.
+-   budući da se pojedinim simbolima malo trguje, iz uzorka su izbačeni simboli za koje je udio broja trgovinskih dana u ukupnom broju mogućih trgovinskih dana najmanje 70%.
+
+```{r}
+#| label: tbl-sample-data
+#| tbl-cap: "Prikaz prvih pet redova OHLCV podataka"
+
+sample_data = prices[, .SD, .SDcols = -c("week", "last_week_day")]
+setcolorder(sample_data, 
+            c("isin", "date", "open", "high", "low", "close", "volume"))
+sample_data[, isin := gsub("[0-9]+", "", isin)]
+sample_data = head(sample_data)
+ft = qflextable(sample_data) |>
+    colformat_double()
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+```
+
+Nakon svih potonjih prilagodbi, ukupni uzorak sadrži `r n` opservacija. U tablici @tbl-sample-data je prikazano prvih pet redova OHLCV podataka.
+
+Na temelju dnevnih OHLCV podataka, konstruirani su prediktori koji se koriste u treniranju modela strojnog učenja. Prediktori su konstruirani na temelju dnevnih podataka, a zatim agregirani na tjednu razinu. U modeliranju se na kraju koristi tjedna frekvencija s tjednim horizontom. Budući da se radi o velikom broju prediktora, u tablici su prikazani opisi grupe prediktora, kao i R i python paketi pomoću kojih su konstruirani. Prvu grupu čine testovi eksplozivnosti univarijantnih vremenskih nizova. Više o ovoj grupi možete pronaći u Pavlidis et al. [@Pavlidis2016], Phillips et al. [@Phillips2015] i Vasilopoulos et al. [@Vasilopoulos2022]. Druga grupa uključuje kreiranje predviđanja na temelju tri univarijantna modela: ARIMA, ETS i NNETAR. Više o ovim modelima moežete pronaći u Hyndman et al. [@Hyndman2008forecast]. sljedeća grupa prediktora uključuje testove strukturnog loma. Više o ovim testovima možete pronaći u [@OttoBreitung2022]. Preostale grupe uključuju prediktore izračunate pomoću programskih paketa koji su razvijeni za generiranje prediktora za analizu vremenskih serija. To uključuje sljedeće grupe: kanoničke karakteristike vremenskih serija ([@Lubba2019]), korištenje paketa za automatsku ekstrakciju prediktora ([@feasts2023], [@tsfeatures2023], [@barandas2020tsfel]). Sljedeća grupa sadrži predviđanja generirana iz Wavelet transformacija ([@WaveletArima2022], [@AMINGHAFARI2007]). Na kraju, autor je napravio svoj funkciju unutar finfeatures R paketa, koja računa brojne preditkore uključujući tehničke indikatore, statistike prinosa na pomičnim prozorima i volatilnosti [@finfeatures2023].
+
+Kod za izračun prediktora dostupan je na GitHub stranici[^1]
+
+[^1]: Poveznica na kod: <https://github.com/MislavSag/finfeatures>
+
+```{r}
+#| label: tbl-predictors
+#| tbl-cap: "Opis prediktora"
+
+prediktori = data.frame(
+  `Grupa prediktora` = c("Testovi eksplozivnosti", 
+                         "Univarijantni predikcijski modeli",
+                         "Testovi strutkurnog loma",
+                         "Kanoničke karakteristike vremenskih serija",
+                         "Automatska ekstrakcija prediktora",
+                         "Wavelet ARIMA",
+                         "Tehnički indikatori i statistike tržišta"),
+  Paket = c("exuber (R)", 
+            "forecasts (R)", 
+            "backCUSUM (R)",
+            "catch22 (R)",
+            "feasts (R), tsfeatures (R), tsfel (py)",
+            "WaveletArima (R)",
+            "finfeatures (R)"),
+    Opis = c("Namijenjen je ekonometrijskoj analizi eksplozivnih vremenskih nizova, posebice za testiranje i datiranje razdoblja eksplozivne dinamike koristeći rekurzivne testove jediničnih korijena. Omogućuje efikasno izračunavanje kroz algoritam rekurzivnih najmanjih kvadrata i uključuje funkcije za analizu podataka univarijatnih i panel podataka.",
+           "Pruža metode i alate za prikazivanje i analizu prognoza jednovarijatnih vremenskih nizova, uključujući eksponencijalno izglađivanje putem modela stanja i automatsko ARIMA modeliranje. Paket nudi razne funkcije za precizno prognoziranje, kao što su automatske ARIMA prognoze, prognoze pomoću ETS modela (Error, Trend, Seasonality), te napredne metode poput TBATS i STL za analizu sezonalnosti.",
+           "Nudi funkcionalnosti za testiranje i praćenje strukturnih promjena u podacima.",
+           "Pruža 22 kanoničke karakteristike vremenskih serija dizajnirane za brzu i efikasnu analizu vremenskih serija, a uključuju karakteristike kao što su autokorelacija, entropija, energija, frekvencija, i druge.",
+           "Ekstrakcija značajki, dekompozicije, statističke sažetke i vizualizacije.",
+           "Integrira valne transformacije s ARIMA modelom kako bi poboljšao točnost prognoziranja vremenskih serija, razlaganjem podataka na podkomponente za smanjenje šuma",
+           "Prediktori su organizirani u grupama kao što su povrati i volatilnost, tehnički indikatori (pokretni prosjeci, oscilatori, bandovi, i drugi indikatori trenda), indikatori temeljeni na volumenu, indikatori divergencije, te pragovi i maksimalne vrijednosti, pružajući detaljan uvid u tržišne trendove, volatilnost, snagu trenda, i tržišne ekstreme.")
+)
+ft = qflextable(prediktori)
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+```
+
+Nakon generiranja svih prediktora, ponovno su poduzete mjere čišćenja podataka. Uzorak je ponovno filtriran tako da su eliminirane sve duple vrijednosti po ID varijablama (simbol i datum), eliminirane su kolone koje imaju više od 50% nedostajućih vrijednosti, maknute su kolone koje imaju više od 2% Inf vrijednosti, te potom i opservacije koje imaju Inf vrijednosti. Također su eliminirane konstantne kolone.
+
+```{r}
+#| cache: true
+
+# Load registry
+reg = loadRegistry(PATH, work.dir=PATH)
+
+# Done ids
+ids = findDone(reg=reg)
+
+# Get metadata for done jobs
+tabs = getJobTable(ids, reg = reg)
+tabs = tabs[, .SD, .SDcols = c("job.id", "job.name", "repl", "prob.pars", "algo.pars")]
+predictions_meta = cbind.data.frame(
+  id = tabs[, job.id],
+  task = vapply(tabs$prob.pars, `[[`, character(1L), "task_id"),
+  learner = gsub(".*regr.|.tuned", "", vapply(tabs$algo.pars, `[[`, character(1L), "learner_id")),
+  cv = gsub("custom_|_.*", "", vapply(tabs$prob.pars, `[[`, character(1L), "resampling_id")),
+  fold = gsub("custom_\\d+_", "", vapply(tabs$prob.pars, `[[`, character(1L), "resampling_id"))
+)
+
+predictions_l = lapply(ids[[1]], function(id_) {
+  # id_ = 1
+  x = tryCatch({readRDS(fs::path(PATH, "results", id_, ext = "rds"))},
+               error = function(e) NULL)
+  if (is.null(x)) {
+    print(id_)
+    return(NULL)
+  }
+  x = x$prediction
+  x["id"] = id_
+  x
+})
+
+predictions = lapply(predictions_l, function(x) {
+  # x = predictions_l[[1]]
+  cbind.data.frame(
+    id = x$id,
+    row_ids = x$test$row_ids,
+    truth = x$test$truth,
+    response = x$test$response
+  )
+})
+predictions = rbindlist(predictions)
+predictions = merge(predictions_meta, predictions, by = "id")
+predictions = as.data.table(predictions)
+
+# import tasks
+tasks_files = dir_ls(fs::path(PATH, "problems"))
+tasks = lapply(tasks_files, readRDS)
+names(tasks) = lapply(tasks, function(t) t$data$id)
+
+# add backend to predictions
+backend_l = lapply(tasks, function(tsk_) {
+  # tsk_ = tasks[[1]]
+  x = tsk_$data$backend$data(1:tsk_$data$nrow,
+                             c("symbol", "week", "..row_id", TARGETS))
+  setnames(x, "..row_id", "row_ids")
+  x
+})
+backends = rbindlist(backend_l, fill = TRUE)
+
+# merge predictions and backends
+predictions = backends[predictions, on = c("row_ids")]
+
+# change month to date from Posixct
+predictions[, week := as.Date(week)]
+
+# clean predictions
+preds = unique(predictions, by = c("row_ids", "week", "task", "learner", "cv"))
+preds = na.omit(preds)
+```
+
+```{r}
+tsk_ = tasks[[1]]
+n_after = tsk_$data$nrow
+n_predictors = length(tsk_$data$feature_names)
+```
+
+Nakon dodavanja i čiščenja prediktora i povećanja frekvencije s dnevne na tjednu frekvenciju, konačan uzorak sadrži `r n_after` opservacija i `r n_predictors` prediktora.
+
+## Sažeta statistika podataka i prediktora
+
+Svako investiranje na financijskom tržištu započinje konstruiranjem univerzuma. Univerzum se bira iz liste kotiranih dionica, a odabir se vrši na temelju različitih kriterija. Slika @fig-ncompanies prikazuje broj dionica koje su kotirale na Zagrebačkoj burzi od 2000. godine. Vidljiv je jasan trend rasta broj dionica do Velike Recesije 2008 i jasan trend pada nakon toga. Nakon 2019. godine broj dionica se stabilizirao na oko 30 dionica. Valja podsjetiti da su iz ukupne populacije dionica u procesu čišćenja podataka neke dionice izbačene iz uzorka jer nisu zadovoljavale kriterije kvalitete podataka.
+
+```{r}
+#| label: fig-ncompanies
+#| fig-cap: "Broj dionica na ZSE"
+
+# number of companies through time
+n_firms = prices[, .N, by = date]
+setorder(n_firms, date)
+n_firms[, N_SMA := TTR::SMA(N, 22)]
+n_firms = na.omit(n_firms)
+ggplot(n_firms, aes(x = date, y = N_SMA)) + 
+  geom_line() + geom_point() + 
+  theme_bw() +
+  gg_theme + 
+  labs(y = "Broj kompanija")
+```
+
+Ključna zavisna vraijble u analizi je tjedni povrat, koji je izračunat iz dnevnih povrata. Tablica @tbl-summary-returns prikazuje statistike tjednih povrata za cijeli uzorak.
+
+```{r}
+#| label: tbl-summary-returns
+#| tbl-cap: "Statističke mjere tjednih povrata"
+
+# summary statistics for stocks returns
+prices_month = prices[last_week_day == TRUE, .(isin, date, close)]
+prices_month[, returns := close / shift(close, 1) - 1]
+summary_by_symbol = prices_month[, .(
+  
+  mean = mean(returns, na.rm = TRUE),
+  median = median(returns, na.rm = TRUE),
+  sd = sd(returns, na.rm = TRUE),
+  skew = skewness(returns, na.rm = TRUE),
+  kurt = kurtosis(returns, na.rm = TRUE),
+  min = min(returns, na.rm = TRUE),
+  max = max(returns, na.rm = TRUE)
+), by = isin]
+summary_returns = summary_by_symbol[, lapply(.SD, mean), 
+                                    .SDcols = c("mean", "median", "sd", "skew", 
+                                                "kurt", "min", "max")]
+ft = qflextable(summary_returns) |>
+    colformat_double()
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+```
+
+# Metodologija
+
+## Modeli strojnog učenja
+
+### Random Forest
+
+Random Forest (RF) je napredni algoritam strojnog učenja koji koristi tehniku ansambla za poboljšanje točnosti i otpornosti na prekomjerno učenje [@Breiman2001RandomForests]. Osnova RF algoritma leži u kombiniranju velikog broja stabala odlučivanja, gdje svako stablo koristi slučajno izabran skup podataka dobiven metodom bagginga. Bagging podrazumijeva stvaranje jedinstvenih podskupova originalnog skupa podataka putem nasumičnog izabiranja opservacija, čime se osigurava da svako stablo u šumi dobiva malo drugačiji skup podataka za učenje. Osim toga, RF unosi slučajnost i u odabir značajki (kolona) za svako stablo, dodatno smanjujući korelaciju među stablima i pomažući u stabilizaciji predikcijske pogreške [@Liaw2002ClassificationAndRegression]. Jedna od ključnih prednosti RF-a u odnosu na pojedinačna stabla odlučivanja jest njezina sposobnost da smanji varijancu bez značajnog povećanja pristranosti, čime se postiže visoka točnost predviđanja [@Cutler2012RandomForests].
+
+Kod predviđanja, RF koristi prosječnu vrijednost predikcija svih stabala u šumi:
+
+$$
+\hat{y} = \frac{1}{B} \sum_{b=1}^{B} f_b(x)
+$$
+
+gdje $B$ označava broj stabala u šumi, $f_b(x)$ je predikcija pojedinog stabla za ulaz (x), a $\hat{y}$ je konačna predikcija algoritma RF. Ova metoda omogućava da se individualne greške stabala kompenziraju, dovodeći do preciznijeg i pouzdanijeg rezultata.
+
+Formulom varijance RF-a može se objasniti kako se smanjuje ukupna varijanca modela s povećanjem broja stabala:
+
+$$ 
+\text{Variance(RF)} = \rho \sigma\^2 + \frac{1-\rho}{B} \sigma\^2 
+$$
+
+Ovdje, $\rho$ predstavlja prosječnu korelaciju između predikcija stabala, a $\sigma\^2$ varijancu pojedincačnog stabla. S povećanjem (B), doprinos nekorelirane varijance se smanjuje, čime se ukupna varijanca RF-a efektivno smanjuje, dok istovremeno održava pristranost na prihvatljivoj razini [@Biau2016RandomForestTour].
+
+### XGBOOST
+
+XGBoost (Extreme Gradient Boosting) predstavlja napredak u području strojnog učenja, posebno u ansambliranju stabala odlučivanja i njihovom sekvencijalnom (aditivnom) treniranju. Algoritam efikasno kombinira prednosti stabala odlučivanja s gradientnim pojačanjem [@Chen2016XGBoost].
+
+Osnovna ideja XGBoost-a leži u optimizaciji složene funkcije cilja koja ne samo da mjeri koliko je model dobar u predviđanjima, već uzima u obzir i kompleksnost modela kako bi se spriječilo prekomjerno učenje. To se postiže kroz pažljivo balansiranje između točnosti predviđanja modela i njegove generalizacijske sposobnosti.
+
+XGBoost implementira ovo kroz dodavanje novih stabala jedno po jedno, gdje svako novo stablo korigira greške napravljene od strane prethodno dodanih stabala. Umjesto da se sva stabla treniraju odjednom, pristup sekvencijalnog dodavanja omogućava XGBoostu da preciznije prilagodi model na temelju prethodnih grešaka. Ovo sekvencijalno treniranje, gdje se svako novo stablo fokusira na prethodne greške, ključno je za smanjenje grešaka i poboljšanje točnosti modela.
+
+Centralna formula koja se koristi za predviđanje u XGBoost modelu je:
+
+$$ 
+\hat{y}*i =* \sum{k=1}\^{K} f_k(x_i) 
+$$
+
+gdje $K$ predstavlja ukupan broj stabala, a $f_k(x_i)$ funkciju k-tog stabla. Ova formula omogućava da se predviđanja izračunaju kao suma predviđanja svih pojedinačnih stabala, čime se postiže veća točnost.
+
+Jedna od ključnih prednosti XGBoost-a je njegova sposobnost da se prilagodi različitim funkcijama gubitka, što ga čini fleksibilnim za širok spektar problema u strojnom učenju. Osim toga, XGBoost uključuje napredne tehnike regularizacije, poput L1 i L2 penalizacije, koje pomažu u kontroli kompleksnosti modela i sprječavaju prekomjerno učenje, čime se dodatno poboljšava performansa modela [@Friedman2001GreedyFunctionApproximation; @Friedman2002StochasticGradientBoosting].
+
+### GLMNET
+
+Generalizirani linearni modeli (GLM) su fleksibilna klasa modela koja se koristi za modeliranje različitih tipova zavisnih varijabli, uključujući kontinuirane, binarne i višeklasne varijable. GLM-ovi su posebno korisni u situacijama kada je potrebno modelirati zavisnost između više prediktora i zavisne varijable, te kada je potrebno kontrolirati utjecaj svakog prediktora na zavisnu varijablu.
+
+Postoji više podvrsta GLM modela, a jedna od najpopularnijih je LASSO (Least Absolute Shrinkage and Selection Operator) i Elastic Net modeli. Ovi modeli koriste regularizaciju kako bi se smanjila varijanca modela i spriječilo prekomjerno učenje. Regularizacija se postiže dodavanjem L1 (LASSO) ili L2 (Ridge) penala na funkciju gubitka, čime se smanjuje utjecaj manje važnih prediktora i poboljšava generalizacijska sposobnost modela.
+
+Ciljna funkcija za Lasso model je:
+
+$$
+\min_{\beta} \left\{ \frac{1}{2N} \sum_{i=1}^{N} (y_i - x_i^T \beta)^2 + \lambda \|\beta\|_1 \right\}
+$$
+
+gdje je $N$ broj opservacija, $y_i$ zavisna varijabla, $x_i$ prediktor, $\beta$ koeficijenti, $\lambda$ parametar regularizacije, a $\|\beta\|_1$ L1 norma koeficijenata predstavlja regularizacijski član koji pomaže u smanjenju varijance modela i sprječava prekomjerno učenje.
+
+Elastic Net model kombinira L1 i L2 penale kako bi se iskoristile prednosti oba pristupa. Ciljna funkcija za Elastic Net model je:
+
+$$
+\min_{\beta} \left\{ \frac{1}{2N} \sum_{i=1}^{N} (y_i - x_i^T \beta)^2 + \lambda_1 \|\beta\|_1 + \frac{\lambda_2}{2} \|\beta\|_2^2 \right\}
+$$
+
+gdje su $\lambda_1$ i $\lambda_2$ parametri regularizacije za L1 i L2 penale, respektivno. Ova funkcija omogućava da se iskoriste prednosti oba pristupa, čime se postiže veća točnost i generalizacijska sposobnost modela.
+
+### NNET
+
+Feed-forward neuronske mreže (FFNs) predstavljaju osnovnu arhitekturu u području neuronskih mreža i strojnog učenja. Karakterizirane svojom sekvencijalnom strukturom slojeva, gdje informacije teku u jednom smjeru od ulaza do izlaza, FFNs su svestrane u rješavanju širokog spektra problema, od zadataka regresije do klasifikacije. Odsutnost ciklusa unutar ovih mreža razlikuje ih od rekurentnih neuronskih mreža, čineći FFNs jednostavnijim, ali moćnim alatima za modeliranje linearnih i nelinearnih odnosa. Njihova arhitektura tipično uključuje tri vrste slojeva: ulazni sloj koji prima podatke, jedan ili više skrivenih slojeva koji izračunavaju transformacije i izlazni sloj koji daje konačnu predikciju.
+
+Operacija unutar feed-forward mreže, posebno s jednim skrivenim slojem za regresiju, matematički se može predstaviti sljedećim formulama:
+
+a)  izlaz $h_j$ svakog neurona $j$ u skrivenom sloju izračunava se kao:
+
+$$
+h_j = \sigma\left( \sum_{i=1}^{n} w_{ij} x_i + b_j \right)
+$$
+
+b)  Konačni izlaz $y$ iz mreže, za zadatke regresije s jednim izlaznim neuronima, je:
+
+$$
+y = \sum_{j=1}^{m} w_{j} h_j + b
+$$
+
+gdje $x_i$ označava ulazne značajke, $w_{ij}$ su težine koje povezuju ulaznu značajku $i$ sa skrivenim neuronima $j$, $b_j$ je pristranost za skriveni neuron $j$, $\sigma$ predstavlja funkciju aktivacije (npr. sigmoidna ili ReLU), $w_{j}$ su težine od skrivenog neurona $j$ do izlaznog neurona, $b$ je pristranost za izlazni neuron, a $m$ je broj neurona u skrivenom sloju.
+
+Jednadžbe sažimaju bit feed-forward obrade, ilustrirajući kako se ulazi transformiraju u izlaze kroz seriju linearnih kombinacija nakon kojih slijedi nelinearna aktivacija. Izbor funkcija aktivacije, broj neurona u skrivenom sloju i metoda treninga (kao što je povratna propagacija za prilagodbu težina) ključni su za sposobnost mreže da modelira složene funkcije i postigne visoke performanse na zadacima regresije.
+
+## Ugniježđena metoda križne validacije s pomičnim prozorom
+
+Ugniježđena metoda križne validacije s pomičnim prozorom (NRWCV) sofisticirana je metodologija dizajnirana za evaluaciju prediktivnih modela s vremenskim serijama. Ova tehnika posebno je korisna u scenarijima koji uključuju sekvencijalno prikupljanje podataka, poput podataka o cijenama dionica. Metodologija se sastoji od vanjske petlje i unutarnje petlje, pri čemu svaka koristi pristup pomičnih prozora. Vanjska petlja dijeli skup podataka na više skupova za trening i testiranje na pomični način, trenirajući model na trenutnom skupu za trening, a zatim ga testirajući na sljedećem skupu za testiranje. To simulira stvarni scenarij gdje se model primjenjuje na neviđene buduće podatke. Ugnežđena unutar vanjske petlje, unutarnja petlja usmjerena je na odabir modela i podešavanje hiperparametara dodatnim dijeljenjem skupa za trening na skupove za trening i validaciju, koristeći pristup pomičnim prozorima. To omogućava procjenu i odabir najučinkovitijih konfiguracija modela. Uvode se i razmaci između skupa za trening i skupa za validaciju, kao i između skupa za validaciju i skupa za testiranje, kako bi se spriječilo prelijevanje podataka iz budućnosti u sadašnjost. Na taj način se onemogućuje prelijevanje horizonta ciljane varijable u skup za validaciju ili test skup.
+
+```{r}
+#| label: tbl-cv-params
+#| tbl-cap: "Duljine prozora ugniježđene metode križne validacije s pomičnim prozorom"
+
+cv_params = data.frame(
+  Trening = c(4*48, 4*72),
+  Razmak = c(1, 1),
+  Validacija = c(3*4, 6*4),
+  Razmak = c(1, 1),
+  Test = c(1, 1)
+)
+ft = qflextable(cv_params)
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+```
+
+Kako bi olakšali razumijevanje ugniježđene metode križne validacije s pomičnim prozorom korištene u ovom radu, na slici @fig-cv prikazujemo uzorak skupa za treniranje, validaciju i testiranje. Slika sadrži dva grafikona jer se u radu koriste 2 različita skupa parametra za duljine skupova kako je prikazano u tablici @tbl-cv-params. Trening skup u prvom NRWCV sadrži 4 godine podataka, tjedan razmaka između skupa za treniranje i validaciju, 3 mjeseca za validaciju, tjedan razmaka između validacije i testiranja, te jedan tjedan za testiranje. U drugom NRWCV skupu, duljine su povećane na 6 godina za trening i 6 mjeseci za validaciju, dok su ostali parametri identični. Lijevi graf na slici @fig-cv prikazuje skupove za treniranje, validaciju i testiranje za prvi NRWCV, dok desni graf prikazuje skupove za drugi NRWCV. Brojevi uz CV (npr. CV-1194) označuje ukupan broj komponenti.
+
+![Skupovi treniranja, validacije i testiranja unutar ugniježđene metode križne validacije s pomičnim prozorom](plot_cv.png){#fig-cv}
+
+## Uglađivanje parametra strojnog učenja
+
+U prethodnom potpoglavlju je opisana metoda ugnježđene metode križne validacije s pomičnim prozorom koja se koristi za evaluaciju prediktivnih modela s vremenskim serijama. U ovom potpoglavlju opisat ćemo kako se koristi metoda ugnježđene metode križne validacije s pomičnim prozorom za ugađanje parametara modela strojnog učenja. U ovom radu koristit ćemo 4 različita modela strojnog učenja: Random Forest, XGBoost, GLMNET i NNET. Svaki model ima svoje hiperparametre koji se moraju ugađati kako bi se postigla najbolja performansa pojedinog modela. U tablici @tbl-tuning-params prikazani su parametri koji će se koristiti za svaki model.
+
+```{r}
+#| label: tbl-tuning-params
+#| tbl-cap: "Parametri za ugađanje modela"
+
+tuning_parameters = data.table(
+  Model = c(rep("Predobrada", 4), rep("Random Forest", 4), rep("XGBoost", 5), rep("Neuronska Mreža", 3), rep("GLMNet", 2)),
+  Parametar = c("dropcorr.cutoff", "winsorizesimple.probs_high", "winsorizesimple.probs_low", "filter_branch.selection",
+                "max.depth", "replace", "mtry.ratio", "num.trees",
+                "alpha", "max_depth", "eta", "nrounds", "subsample",
+                "size", "decay", "maxit",
+                "s", "alpha"),
+  Opis = c("Prag za odbacivanje visoko koreliranih značajki", "Gornji prag vjerojatnosti za winsorizaciju", "Donji prag vjerojatnosti za winsorizaciju", "Odabir filtra značajki",
+           "Maksimalna dubina stabala", "Uzorkovanje podataka s zamjenom", "Omjer varijabli dostupnih za razdvajanje na svakom čvoru stabla", "Broj stabala",
+           "L1 regularizacijski termin na težinama", "Maksimalna dubina stabala", "Korak smanjenja veličine koji se koristi u ažuriranju kako bi se spriječilo prenaučavanje", "Broj rundi pojačavanja", "Omjer uzorkovanja instance za trening",
+           "Broj jedinica u skrivenim slojevima", "Parametar smanjenja težine", "Maksimalan broj iteracija",
+           "Elasticnet miješajući parametar", "L1 regularizacijski put na težinama"),
+  ProstorPretraživanja = c("0.80, 0.90, 0.95, 0.99", "0.999, 0.99, 0.98, 0.97, 0.90, 0.8", "0.001, 0.01, 0.02, 0.03, 0.1, 0.2", "jmi, relief",
+                          "1-15", "TRUE/FALSE", "0.1-1", "10-2000",
+                          "0.001-100 (logaritamska skala)", "1-20", "0.0001-1 (logaritamska skala)", "1-5000", "0.1-1",
+                          "2-15", "0.0001-0.1", "50-500",
+                          "5-30", "1e-4-1 (logaritamska skala)")
+)
+
+# Flextable
+ft = qflextable(tuning_parameters)
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+```
+
+Osim uglađivanja parametara pojedinih modela, u ovom radu koristit ćemo i različite tehnike predobrade podataka kako bismo poboljšali kvalitetu i performanse modela. U tablici @tbl-preprocessing-params prikazane su i tehnike predobrade podataka koje će se koristiti prije svake procjene parametara modela. U Prije svakog modela, koristit će se sljedeće preprocesne radnje: 1) Brisanje kolona koje imaju više od 5% nedostajućih vrijednosti. 2) Brisanje opservacija koje imaju nedostajuće vrijednosti. 3) Brisanje konstantnih kolona. 4) *Winsorizacija* podataka. Winsorizacija ograničava ekstremne vrijednosti na određene percentilne vrijednosti, čime se smanjuje njihov utjecaj na model. Ovaj korak je dio prilagođavanja podataka kako je opsiano u tablici @tbl-tuning-params. 5) Odbacivanje visoko koreliranih značajki, koja smanjuje redundanciju u podacima postavljanjem praga korelacije iznad kojeg značajke smatramo previše sličnima i stoga jednu od njih odbacujemo. Ovaj korak je također dio prilagođavanja podataka kako je opsiano u tablici @tbl-tuning-params. 6) Uniformiyacija podataka. 7) Filtriranje prediktora pomoću dva filtera JMI i Relief, koje nam omogućavaju da se fokusiram samo na one prediktore koje pružaju najviše informacija za predviđanje.
+
+Nakon predobrade, usredotočujemo se na optimizaciju hiperparametara modela. Za modele poput Random Foresta, XGBoost, neuronskih mreža i GLMNeta, pažljivo biramo raspon hiperparametara za istraživanje. Za Random Forest, na primjer, podešavamo maksimalnu dubinu stabala, omjer varijabli dostupnih za razdvajanje na svakom čvoru, broj stabala, i da li uzorkovanje treba biti s zamjenom ili bez. U slučaju XGBoost, optimiziramo parametre poput stope učenja, maksimalne dubine, broja iteracija pojačavanja, i omjera uzorkovanja. Za neuronske mreže, fokusiramo se na broj jedinica u skrivenim slojevima, parametar smanjenja težine i maksimalan broj iteracija. Za GLMNet, optimizacija uključuje podešavanje ElasticNet miješajućeg parametra i L1 regularizacije.
+
+Optimizacija hiperparametara provodi se kroz postupak ugniježđene unakrsne validacije, gdje unutarnji sloj služi za podešavanje hiperparametara, dok vanjski sloj procjenjuje performanse modela s optimalnim hiperparametrima. Ovaj pristup osigurava da naša evaluacija modela bude nepristrana i da dobro generalizira na neviđene podatke.
+
+Kroz ovaj temeljit proces, naš cilj je razviti modele koji nisu samo prilagođeni trenutnim podacima, već su i sposobni generalizirati i performirati dobro na širokom rasponu scenarija, čime se osigurava njihova praktična primjenjivost i robustnost.
+
+# Rezultati
+
+## Uspješnost modela
+
+U nastavku prikazujemo uspješnost pojedinih modela u predviđanju tjednih povrata dionica koje su korirale na ZSE od 2000. Uspješnost će se mjeriti pomoću različitih mjera koje se koriste za analiziranje uspješnosti klasifikacijskih i regresijdkih modela. Također će se prikazati i jednostavni backtest, koji pokazuju rezultate trgovinske strategije, koja koristi predviđanja modela za konstruiranje portfolia dugih pozicija s tjednim rebalansiranjem.
+
+```{r}
+#| label: tbl-performance-measures
+#| tbl-cap: "Mjere uspješnosti modela"
+
+# Define the measures and their interpretations
+measures <- c("Točnost (acc)", 
+              "F-beta Ocjena (fbeta)", 
+              "Stopa Pravih Pozitivnih (TPR) / Odziv", 
+              "Preciznost", 
+              "Stopa Pravih Negativnih (TNR)", 
+              "Vrijednost Negativne Predikcije (NPV)", 
+              "Srednja Kvadratna Greška (MSE)", 
+              "Srednja Apsolutna Greška (MAE)")
+
+interpretations <- c("Ukazuje na opću točnost modela. Može biti varljiva u nebalansiranim skupovima podataka.",
+                     "Balansira preciznost i odziv. β > 1 daje veću važnost odzivu, dok β < 1 daje veću važnost preciznosti.",
+                     "Proporcija stvarno pozitivnih ispravno identificiranih. Ne uzima u obzir lažne pozitivne.",
+                     "Proporcija ispravno identificiranih pozitivnih. Važno kada su lažni pozitivni skupi.",
+                     "Proporcija stvarno negativnih ispravno identificiranih. Važno za ispravno predviđanje negativnih.",
+                     "Proporcija ispravno identificiranih negativnih rezultata. Korisno u medicinskom testiranju.",
+                     "Mjeri kvalitetu predikatora. Niže vrijednosti ukazuju na bolje pristajanje. Osjetljivo na izvanredne vrijednosti.",
+                     "Mjeri prosječnu veličinu grešaka u skupu predikcija, bez razmatranja njihovog smjera. Manje osjetljivo na izvanredne vrijednosti od MSE.")
+
+# Combine into a data.frame
+performance_measures_df = data.frame(Mjera = measures, Interpretacija = interpretations)
+
+# Flextable
+ft = qflextable(performance_measures_df)
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+```
+
+Za početak analiziramo uspješnost modela s obzirom na različite mjere.Sve korištene mjere su objašnenje u tablici @tbl-performance-measures. Važno je napomenuti da je model strojnog učenja koji je treniran regresijski model. Drugim riječima, zavisna varijabla je kontinuirana, a ne diskretna. Međutim, kako bi dobili bolji uvid u uspješnost modela, koristit ćemo i mjere koje se koriste za klasifikacijske modele. Pri tome su klase konstruirane na način da se dionice koje imaju pozitivne procjenjene tjedne povrate smatraju klasom 1, dok se dionice koje imaju negativne tjedne povrate smatraju klasom 0.
+
+Osim pojedinačnih modela strojnog učenja, koji su korišteni u analizi, u nastavku ću procjenjivati i uspješnost ansambla modela. Ansambl modeli su modeli koji kombiniraju više modela kako bi se poboljšala uspješnost predviđanja. U ovom radu korišteni su tri jednostavna ansambla: srednja vrijednost, medijan i suma. Srednja vrijednost ansamblira predviđanja svih modela tako da se uzima prosječna vrijednost. Medijan ansamblira predviđanja tako da se uzima medijan. Suma ansamblira predviđanja tako da se uzima suma svih predviđanja.
+
+```{r}
+# prediction to wide format
+predsw = dcast(
+  preds,
+  task + cv + week + symbol + cv + truth  ~ learner,
+  value.var = "response"
+)
+```
+
+```{r}
+# ensambles
+cols = colnames(predsw)
+cols = cols[(which(cols == "truth")+1):ncol(predsw)]
+p = predsw[, ..cols]
+pm = as.matrix(p)
+predsw = cbind(predsw, mean_resp = rowMeans(p, na.rm = TRUE))
+predsw = cbind(predsw, median_resp = rowMedians(pm, na.rm = TRUE))
+predsw = cbind(predsw, sum_resp = rowSums2(pm, na.rm = TRUE))
+predsw = cbind(predsw, iqrs_resp = rowIQRs(pm, na.rm = TRUE))
+predsw = cbind(predsw, sd_resp = rowMads(pm, na.rm = TRUE))
+predsw = cbind(predsw, q9_resp = rowQuantiles(pm, probs = 0.9, na.rm = TRUE))
+predsw = cbind(predsw, max_resp = rowMaxs(pm, na.rm = TRUE))
+predsw = cbind(predsw, min_resp = rowMins(pm, na.rm = TRUE))
+predsw = cbind(predsw, all_buy = rowAlls(pm >= 0, na.rm = TRUE))
+predsw = cbind(predsw, all_sell = rowAlls(pm < 0, na.rm = TRUE))
+predsw = cbind(predsw, sum_buy = rowSums2(pm >= 0, na.rm = TRUE))
+predsw = cbind(predsw, sum_sell = rowSums2(pm < 0, na.rm = TRUE))
+
+```
+
+```{r}
+# Calculat measures help function
+sign01 = function(x) as.factor(ifelse(x > 0, 1, 0))
+calculate_msrs = function(t, res) {
+  t_sign   = sign01(t)
+  res_sign = sign01(res)
+  list(acc       = mlr3measures::acc(t_sign, res_sign),
+       fbeta     = mlr3measures::fbeta(t_sign, res_sign, positive = "1"),
+       tpr       = mlr3measures::tpr(t_sign, res_sign, positive = "1"),
+       precision = mlr3measures::precision(t_sign, res_sign, positive = "1"),
+       tnr       = mlr3measures::tnr(t_sign, res_sign, positive = "1"),
+       npv       = mlr3measures::npv(t_sign, res_sign, positive = "1"),
+       mse       = mlr3measures::mse(t, res),
+       mae       = mlr3measures::mae(t, res)
+       )
+}
+```
+
+```{r}
+cols = colnames(predsw)
+cols = cols[(which(cols == "truth")+1):which(cols == "sum_resp")]
+preds_perf = melt(predsw, 
+                  id.vars = c("task", "cv", "truth", "week", "symbol"),
+                  measure.vars = cols)
+```
+
+```{r}
+#| label: tbl-performance
+#| tbl-cap: "Uspješnost modela"
+
+by_ = c("cv", "variable")
+dt_ = preds_perf[, calculate_msrs(truth, value), by = by_]
+# fwrite(dt_, "data/preds_perf.csv")
+ft = qflextable(dt_) |>
+    colformat_double()
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+
+```
+
+Analizom rezultata u tablici @tbl-performance uočavamo da postoji značajna varijacija u performansama između različitih modela strojnog učenja - glmnet, nnet, ranger, xgboost i ansambl modela. Svaki model pokazuje svoje specifične snage i slabosti u odnosu na različite evaluacijske metrike.
+
+Započnimo s modelom glmnet. Ovi modeli imaju relativno visoku stopu točnih pozitiva (TPR), što znači da su efikasni u identificiranju pozitivnih slučajeva. Međutim, njihova preciznost je niža u usporedbi s drugim modelima, što ukazuje na veći broj lažno pozitivnih rezultata. To može biti prihvatljivo u situacijama gdje je važnije ne propustiti pozitivne slučajeve nego što je važno smanjiti broj lažno pozitivnih.
+
+Modeli nnet pokazuju bolju ravnotežu između stope točnih pozitiva (TPR) i preciznosti. To ukazuje na to da su manje skloni generiranju lažno pozitivnih rezultata dok još uvijek održavaju solidnu sposobnost identificiranja pozitivnih slučajeva. Ova ravnoteža čini nnet modele potencijalno prikladnijima za primjene gdje su i lažno pozitivni i lažno negativni rezultati problematični.
+
+Model ranger, s druge strane, ima performanse slične nnet modelima u pogledu TPR i preciznosti, ali s nešto boljim rezultatima u nekim metrikama. To može ukazivati na njihovu veću efikasnost u specifičnim scenarijima ili na određenim skupovima podataka.
+
+Ansambl modeli pokazuju relativno slične performanse. Preciznost i točnost im je identična, dok postoji vrlo mala razlika u TPR i NPV. Ansambl modeli ne pokazuju značajno bolje rezultate u odnosu na pojedinačne modele, barem kada se kao mjere koriste mjere za klasifikacijsje modele.
+
+Gledajući mjere pogrešaka za regesijske model, MSE i MAE pokazuju kako se različiti modeli nose s greškama u svojim predviđanjima. Iako nnet modeli pokazuju veći MSE u jednom slučaju, što može ukazivati na veću osjetljivost na iznimke, njihove vrijednosti MAE su relativno niske, sugerirajući da su njihova predviđanja u prosjeku bliže stvarnim vrijednostima. Gledajući u cjelini, glmnet modeli imaju nešto bolje rezultate MAE, što može ukazivati na njihovu veću konzistentnost u predviđanjima.
+
+U kontekstu izbora modela za specifičnu strategiju trgovanja, važno je razmotriti kako se različite metrike usklađuju s investicijskim ciljevima. Na primjer, ako je cilj maksimalno smanjiti lažno negativne rezultate, modeli s visokim TPR-om kao što su glmnet mogli bi biti preferirani. S druge strane, ako je prioritet minimizirati pogreške u predviđanju, moglo bi biti bolje odabrati model s nižim MSE i MAE vrijednostima.
+
+Ako uspredimo rezultate s obzirom na dva pristupa krićžne validacije, možemo uočiti da su rezultati nešto bolji za klrižne validacije koje koriste kraće razdoblje treniranja i validacije. Ovo može ukazivati na to da su modeli osjetljiviji na promjene u podacima, te da je potrebno češće ažuriranje modela kako bi se održala njihova uspješnost.
+
+U zaključku, detaljna analiza i usporedba modela glmnet, nnet i ranger pokazuje da nema univerzalno najboljeg modela; umjesto toga, izbor modela trebao bi biti vođen specifičnim zahtjevima i ograničenjima investicijske strategije. Razumijevanje prednosti i slabosti svakog modela ključno je za optimizaciju performansi strojnog učenja u različitim primjenama.
+
+## Backtest
+
+Iako prikazane mjere uspješnosti modela daju korisne uvide u performanse pojedinih modela, one ne daju uvid u performanse modela u kontekstu investicijske strategije. Kako bi se dobio bolji uvid u performanse modela, u ovom dijelu ćemo provesti jednostavan backtest invesicijske stategija. Backtest je simulacija performansi investicijske strategije na povijesnim podacima. U ovom radu, investicijska strategija je konstruiranje portfolia dugih pozicija s tjednim rebalansiranjem. Portfolij se konstruira na temelju predviđanja modela, a svaki tjedan se rebalansira na temelju novih predviđanja.
+
+```{r}
+# Create portfolio returns
+portfolios = preds_perf[value > 0]
+portfolios = portfolios[
+  , .(dt_ = .(dcast(.SD, week ~ symbol, value.var = "truth"))), 
+  by = .(cv, variable)]
+portfolios[, dt_ := lapply(dt_, setnafill, fill = 0)]
+portfolios[, portfolio_returns := map(dt_, function(x) Return.portfolio(x))]
+```
+
+```{r}
+calculatePortfolioStats <- function(portfolioReturns) {
+  # portfolioReturns = portfolios[, portfolio_returns][[1]]
+  # Ensure the input is an xts or time series object
+  if (!is.xts(portfolioReturns)) {
+    stop("portfolioReturns must be an xts object.")
+  }
+  
+  # Calculate statistics
+  annualizedReturn = Return.annualized(portfolioReturns)[[1]]
+  annualizedSD = sqrt(52) * sd(portfolioReturns)
+  sharpeRatio = SharpeRatio.annualized(portfolioReturns)[[1]]
+  maxDrawdown = maxDrawdown(portfolioReturns)
+  sortinoRatio = SortinoRatio(portfolioReturns)[[1]]
+
+  # Create data.table from statistics
+  portfolio_perf = data.table(
+    "Godišnji povrati" = annualizedReturn,
+    `Godišnja SD` = annualizedSD,
+    `Sharpov omjer` = sharpeRatio,
+    `Maksimalni gubitak` = maxDrawdown,
+    `Sortinov omjer` = sortinoRatio
+  )
+  
+  return(portfolio_perf)
+}
+```
+
+```{r}
+#| label: tbl-portfolio-performance
+#| tbl-cap: "Statističke mjere portfolia"
+
+# Calculate portfolio statistics
+portfolio_stats = portfolios[, .(lapply(portfolio_returns, function(x) calculatePortfolioStats(x)))]
+portfolio_stats = rbindlist(portfolio_stats[[1]])
+portfolio_stats = rcbind(portfolios[, .(Model = variable, CV = cv)], portfolio_stats)
+
+# Flextable
+ft = qflextable(portfolio_stats) |>
+  colformat_double()
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+```
+
+Tablica @tbl-portfolio-performance prikazuje statističke mjere portfolia za svaki model i svaku ugniježđenu metodu križne validacije. Usporedbom statističkih mjera portfolia možemo dobiti uvid u performanse investicijske strategije koja trguje na temelju korištenih modela.
+
+```{r}
+#| label: tbl-portfolio-performance-sr
+#| tbl-cap: "Sharpov omjer za svaki model"
+
+# Portfolio SR
+portfolio_stats_sr = portfolio_stats[, .("Sharpov omjer" = mean(`Sharpov omjer`)), 
+                                     by = Model]
+setorder(portfolio_stats_sr, "Sharpov omjer")
+
+# Flextable
+ft = qflextable(portfolio_stats_sr) |>
+  colformat_double()
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+```
+
+Budući da se kao mjera uspješnosti portfolia u literaturi najčešće koristi Sharpeov omjer, kreirana je i posebna talbia koja pokazuje samo Sharpeov omjer za svaki model, pri čemu je uzet prosjek rezultata po križnim validacijama. Rezultati su dani u tablici @tbl-portfolio-performance-sr.
+
+Modeli glmnet pokazuju najniže godišnje povrate (11% i 12%) s prilično niskom godišnjom standardnom devijacijom (0,11 i 0,13), što rezultira najmanjim Sharpeovim omjerom (0,95 i 0,92) i Sortinovim omjerom (0,21 i 0,20). Ako kao uspješnost koristimo Sharpov omjer, nakon glmnet-a, po uspješnosti slijede nnet i ranger. Modeli nnet pokazuju poboljšanje u godišnjim povratima (0,14 i 0,17) uz sličnu ili nešto veću standardnu devijaciju u usporedbi s modelima glmnet. Sharpeov i Sortinov omjer su bolji (1,28 i 1,08 za Sharpeov omjer te 0,32 i 0,25 za Sortinov omjer). Modeli ranger pokazuju još veće godišnje povrate (0,22 i 0,20) s većom godišnjom standardnom devijacijom (0,19 i 0,16), ali i dalje zadržavaju prilično visoke Sharpeove i Sortinove omjere (1,16 i 1,24 za Sharpeov omjer te 0,28 i 0,30 za Sortinov omjer). To sugerira da ranger modeli dobro upravljaju rizikom, pružajući pritom solidne povrate. Modeli xgboost imaju slične godišnje povrate kao nnet modeli, ali s nižom godišnjom standardnom devijacijom, što rezultira najvišim Sharpeovim omjerom među pojedinačnim modelima (1,33 i 1,28) i solidnim Sortinovim omjerima (0,31 i 0,30). Ovo ukazuje na to da xgboost modeli pružaju najbolju ravnotežu između rizika i povrata.
+
+Ansambl modeli mean_resp, median_resp i sum_resp pokazuju visoke godišnje povrate (0,18 i 0,19) s relativno niskom godišnjom standardnom devijacijom, što rezultira vrlo visokim Sharpeovim omjerima i Sortinovim omjerima. Dakle, anasambl pojedinačnih modela daju bolje rezultate od pojedinačnih modela. Pri tome prosjek predikcija daje bolje rezultate od medijana predikcija.
+
+Ukratko, tablica pruža uvid u to kako različiti modeli balansiraju između rizika i povrata. Modeli s visokim Sharpeovim i Sortinovim omjerima, kao što su xgboost i mean_resp, izgledaju kao najprivlačnije opcije za investitore koji traže optimalnu ravnotežu između rizika i mogućih povrata.
+
+Radi laše predodžbe o performansama portfolia, prikazat ćemo i grafikon koji prikazuje povrat portfolia kroz vrijeme. Radi bolje usporedbe, prikazat ćemo povrat portfolia za svaki model i svaku ugniježđenu metodu križne validacije.
+
+```{r}
+#| label: fig-portfolio-returns
+#| caption: "Krivulja kapitala portfolia"
+
+# Merge all returns to DT
+equity_curves = Reduce(function(x, y) cbind(x, y), portfolios[, portfolio_returns])
+colnames(equity_curves) = portfolios[, paste0(variable, "_", cv)]
+equity_curves = equity_curves[, seq(2, ncol(equity_curves)-2, 2)]
+chart.CumReturns(equity_curves, plot.engine = "ggplot2") +
+  theme_minimal() +
+  gg_theme + 
+  labs(title = "Krivulja kapitala portfolia")
+  
+```
+
+Slika @fig-portfolio-returns prikazuje krivulje kapitala portfolia za svaki model. Prikazani su rezultati za samo jednu verziju križne validacije (s 1194 foldova). Uočavamo da su krivulje kapitala portfolia za modele ranger i mean_resp najviše, što je u skladu s rezultatima iz tablice @tbl-portfolio-performance-sr. Ovo sugerira da su ranger i mean_resp modeli najbolji izbor za investitore koji traže optimalnu ravnotežu između rizika i mogućih povrata. NA slici se vidi da nedostaju neke opservacije za GLMNET model jer model u nekim razdobljima predviđa iskljičivo pad cijena dionica, pa sukladno tome ne drži nikakve pozicije.
+
+# Zaključak
+
+# Literatura
+
+::: {#refs}
+:::

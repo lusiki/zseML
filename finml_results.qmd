@@ -10,7 +10,7 @@ editor: visual
 ```{r}
 # Parameters
 # TODO: parametrize the script
-PATH = "F:/zse/results"
+PATH = "F:/zse/results_week"
 TYPE = "predictions" # can be predictions and models
 TARGETS = "target"
 
@@ -117,7 +117,7 @@ names(tasks) = lapply(tasks, function(t) t$data$id)
 backend_l = lapply(tasks, function(tsk_) {
   # tsk_ = tasks[[1]]
   x = tsk_$data$backend$data(1:tsk_$data$nrow,
-                             c("symbol", "month", "..row_id", TARGETS))
+                             c("symbol", "week", "..row_id", TARGETS))
   setnames(x, "..row_id", "row_ids")
   x
 })
@@ -127,12 +127,12 @@ backends = rbindlist(backend_l, fill = TRUE)
 predictions = backends[predictions, on = c("row_ids")]
 
 # change month to date from Posixct
-predictions[, month := as.Date(month)]
+predictions[, week := as.Date(week)]
 ```
 
 ```{r}
 # clean predictions
-preds = unique(predictions, by = c("row_ids", "month", "task", "learner", "cv"))
+preds = unique(predictions, by = c("row_ids", "week", "task", "learner", "cv"))
 preds = na.omit(preds)
 ```
 
@@ -156,7 +156,7 @@ kbl(preds[, .N, by = .(Task = task, CV = cv)], format="html") %>%
 # prediction to wide format
 predsw = dcast(
   preds,
-  task + cv + month + symbol + cv + truth  ~ learner,
+  task + cv + week + symbol + cv + truth  ~ learner,
   value.var = "response"
 )
 ```
@@ -204,7 +204,7 @@ calculate_msrs = function(t, res) {
 cols = colnames(predsw)
 cols = cols[(which(cols == "truth")+1):which(cols == "sum_resp")]
 preds_perf = melt(predsw, 
-                  id.vars = c("task", "cv", "truth", "month", "symbol"),
+                  id.vars = c("task", "cv", "truth", "week", "symbol"),
                   measure.vars = cols)
 ```
 
@@ -220,11 +220,11 @@ DT_template(preds_perf[, calculate_msrs(truth, value), by = by_], pl=15)
 #### LONG OMLY - Buy all with positive prediction
 
 ```{r}
-var_ = "ranger"
-cv_ = 207
+var_ = "mean_resp"
+cv_ = 1182
 portfolio = preds_perf[variable == var_ & cv == cv_]
 portfolio = portfolio[value > 0]
-portfolio = dcast(portfolio, month ~ symbol, value.var = "truth")
+portfolio = dcast(portfolio, week ~ symbol, value.var = "truth")
 # non_na_counts = rowSums(!is.na(portfolio[,-1]))  # Exclude the 'month' column in the calculation
 # weights = portfolio[, .(month = month)]  # Copy the 'month' column
 # for (col in names(portfolio)[-1]) {  # Loop through stock return columns, excluding 'month'
