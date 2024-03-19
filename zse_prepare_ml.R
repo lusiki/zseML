@@ -535,38 +535,38 @@ designs_l = lapply(custom_cvs, function(cv_) {
 })
 designs = do.call(rbind, designs_l)
 
-# try plain benchmark
-bmr = benchmark(designs[16], store_models = TRUE)
-bmr_dt = as.data.table(bmr)
-bmr_dt$prediction
-bmr_dt$learner[[1]]$state$model$tuning_instance$archive
-bmr_dt$learner[[1]]$state$model$learner$state$model$regr.ranger
-cols_test = bmr_dt$learner[[1]]$state$model$learner$state$model$relief$outtasklayout
-best_params_ = bmr_dt$learner[[1]]$tuning_result
+# # try plain benchmark
+# bmr = benchmark(designs[16], store_models = TRUE)
+# bmr_dt = as.data.table(bmr)
+# bmr_dt$prediction
+# bmr_dt$learner[[1]]$state$model$tuning_instance$archive
+# bmr_dt$learner[[1]]$state$model$learner$state$model$regr.ranger
+# cols_test = bmr_dt$learner[[1]]$state$model$learner$state$model$relief$outtasklayout
+# best_params_ = bmr_dt$learner[[1]]$tuning_result
 
-# # test
-# DT[date > (max(date) - 10)][, 1:10]
-# DT[date > (max(date) - 10)][, target]
-# 4780 works
-# 4782 doesnt work
-x = task$data(designs$resampling[[5]]$test_set(1L),
-              cols = c("date", task$feature_names, "target"))
-x[1:15, 1:15]
-any(is.na(x))
-na_cols = x[, colSums(is.na(.SD)), .SDcols = is.numeric]
-na_cols[na_cols > 0]
-na_cols[na_cols > 0] %in% cols_test[, id]
-x[, .(pretty2, returns1008, sdRogerssatchell22, sdYangzhang22, volume1008)]
-x[, target]
-x[, .(tSFEL0FFTMeanCoefficient566)]
-cols = bmr_dt$learner[[1]]$state$model$learner$state$model$relief$outtasklayout[, id]
-y = x[, ..cols]
-# check for consant columns in y
-y = x[, lapply(.SD, function(x) DescTools::Winsorize(x, probs = c(0.01, 0.99), na.rm = TRUE))]
-abs(cor(y)[lower.tri(cor(y))]) >= 0.99
-y[, lapply(.SD, function(x) sd(x))]
-
-bmr_dt$learner[[1]]$state$model$learner$predict_newdata(x)
+# # # test
+# # DT[date > (max(date) - 10)][, 1:10]
+# # DT[date > (max(date) - 10)][, target]
+# # 4780 works
+# # 4782 doesnt work
+# x = task$data(designs$resampling[[5]]$test_set(1L),
+#               cols = c("date", task$feature_names, "target"))
+# x[1:15, 1:15]
+# any(is.na(x))
+# na_cols = x[, colSums(is.na(.SD)), .SDcols = is.numeric]
+# na_cols[na_cols > 0]
+# na_cols[na_cols > 0] %in% cols_test[, id]
+# x[, .(pretty2, returns1008, sdRogerssatchell22, sdYangzhang22, volume1008)]
+# x[, target]
+# x[, .(tSFEL0FFTMeanCoefficient566)]
+# cols = bmr_dt$learner[[1]]$state$model$learner$state$model$relief$outtasklayout[, id]
+# y = x[, ..cols]
+# # check for consant columns in y
+# y = x[, lapply(.SD, function(x) DescTools::Winsorize(x, probs = c(0.01, 0.99), na.rm = TRUE))]
+# abs(cor(y)[lower.tri(cor(y))]) >= 0.99
+# y[, lapply(.SD, function(x) sd(x))]
+# 
+# bmr_dt$learner[[1]]$state$model$learner$predict_newdata(x)
 
 if (interactive()) {
   # show all combinations from search space, like in grid
