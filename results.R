@@ -46,8 +46,28 @@ predictions_l = lapply(unlist(ids_done), function(id_) {
   x["id"] = id_
   x
 })
+
+predictions = list()
+for (i in seq_along(predictions_l)) {
+  # i = 4185
+  # print(i)
+  x = predictions_l[[i]]
+  if (length(x$test$row_ids) == 0) {
+    print(i)
+    next
+  }
+  predictions[[i]] = cbind.data.frame(
+    id = x$id,
+    row_ids = x$test$row_ids,
+    truth = x$test$truth,
+    response = x$test$response
+  )
+}
+
 predictions = lapply(predictions_l, function(x) {
-  # x = predictions_l[[1]]
+  # length(predictions_l)
+  # x = predictions_l[[7130]]
+  print(length(x$test$response))
   cbind.data.frame(
     id = x$id,
     row_ids = x$test$row_ids,
@@ -59,18 +79,17 @@ predictions = rbindlist(predictions)
 predictions = merge(predictions_meta, predictions, by = "id")
 predictions = as.data.table(predictions)
 
-# import tasks
+# Import tasks
 tasks_files = dir_ls(fs::path(PATH, "problems"))
 tasks = lapply(tasks_files, readRDS)
 names(tasks) = lapply(tasks, function(t) t$data$id)
-tasks
+# tasks
 
-# add backend to predictions
+# Add backend to predictions
 backend_l = lapply(tasks, function(tsk_) {
   # tsk_ = tasks[[1]]
-  x = tsk_$data$backend$data(1:tsk_$data$nrow,
-                             c("symbol", "month", "..row_id"))
-  setnames(x, c("symbol", "month", "row_ids"))
+  x = tsk_$data$backend$data(1:tsk_$data$nrow, c("symbol", "date", "..row_id"))
+  setnames(x, c("symbol", "date", "row_ids"))
   x
 })
 backends = rbindlist(backend_l, fill = TRUE)
@@ -87,12 +106,12 @@ predictions = backends[predictions, on = c("row_ids")]
 # mlr_measures$add("portfolio_ret", PortfolioRet)
 
 # merge backs and predictions
-predictions[, month := as.Date(month)]
+predictions[, date := as.Date(date)]
 
 
 # PREDICTIONS RESULTS -----------------------------------------------------
 # remove dupliactes - keep firt
-predictions = unique(predictions, by = c("row_ids", "month", "task", "learner", "cv"))
+predictions = unique(predictions, by = c("row_ids", "date", "task", "learner", "cv"))
 
 # predictions
 predictions[, `:=`(

@@ -47,9 +47,9 @@ print("Prepare data")
 # read predictors
 if (interactive()) {
   # fs::dir_ls("data")
-  DT = fread("data/zse-predictors-20240318.csv")
+  DT = fread("data/zse-predictors-20240320.csv")
 } else {
-  DT = fread("zse-predictors-20240318.csv")
+  DT = fread("zse-predictors-20240320.csv")
 }
 
 # convert tibble to data.table
@@ -226,7 +226,7 @@ create_custom_rolling_windows = function(task,
 
 # create list of cvs
 custom_cvs = list()
-custom_cvs[[1]] = create_custom_rolling_windows(task$clone(), "week", 48, 1, 3*4, 1) # TEST
+# custom_cvs[[1]] = create_custom_rolling_windows(task$clone(), "week", 48, 1, 3*4, 1) # TEST
 custom_cvs[[1]] = create_custom_rolling_windows(task$clone(), "week", 4*48, 1, 3*4, 1)
 custom_cvs[[2]] = create_custom_rolling_windows(task$clone(), "week", 4*72, 1, 6*4, 1)
 

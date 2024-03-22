@@ -34,7 +34,7 @@ set_flextable_defaults(
   layout = "autofit"
 )
 gg_theme = theme(axis.title.x = element_blank())
-PATH = "F:/zse/results_week"
+PATH = "F:/zse/results"
 TYPE = "predictions" # can be predictions and models
 TARGETS = "target"
 ```
@@ -88,7 +88,7 @@ data_plot = as.xts.data.table(prices[isin == isin_, .(date, close)])
 plot(data_plot, main = isin_)
 
 #  remove symbols with low number of observations
-threshold = 0.7
+threshold = 0.6
 monnb = function(d) { lt = as.POSIXlt(as.Date(d, origin="1900-01-01")); lt$year*52 + lt$mon*4 }
 mondf = function(d1, d2) { as.integer(monnb(d2) - monnb(d1)) }
 diff_in_weeks = prices[, .(monthdiff = mondf(min(date), max(date))), by = "isin"]
@@ -237,15 +237,31 @@ predictions_l = lapply(ids[[1]], function(id_) {
   x
 })
 
-predictions = lapply(predictions_l, function(x) {
-  # x = predictions_l[[1]]
-  cbind.data.frame(
+predictions = list()
+for (i in seq_along(predictions_l)) {
+  # i = 4185
+  # print(i)
+  x = predictions_l[[i]]
+  if (length(x$test$row_ids) == 0) {
+    print(i)
+    next
+  }
+  predictions[[i]] = cbind.data.frame(
     id = x$id,
     row_ids = x$test$row_ids,
     truth = x$test$truth,
     response = x$test$response
   )
-})
+}
+# predictions = lapply(predictions_l, function(x) {
+#   # x = predictions_l[[1]]
+#   cbind.data.frame(
+#     id = x$id,
+#     row_ids = x$test$row_ids,
+#     truth = x$test$truth,
+#     response = x$test$response
+#   )
+# })
 predictions = rbindlist(predictions)
 predictions = merge(predictions_meta, predictions, by = "id")
 predictions = as.data.table(predictions)
@@ -258,8 +274,8 @@ names(tasks) = lapply(tasks, function(t) t$data$id)
 # add backend to predictions
 backend_l = lapply(tasks, function(tsk_) {
   # tsk_ = tasks[[1]]
-  x = tsk_$data$backend$data(1:tsk_$data$nrow,
-                             c("symbol", "week", "..row_id", TARGETS))
+  # x = tsk_$data$backend$data(1:tsk_$data$nrow, c("symbol", "week", "..row_id", TARGETS))
+  x = tsk_$data$backend$data(1:tsk_$data$nrow, c("symbol", "date", "..row_id", TARGETS))
   setnames(x, "..row_id", "row_ids")
   x
 })
@@ -269,10 +285,12 @@ backends = rbindlist(backend_l, fill = TRUE)
 predictions = backends[predictions, on = c("row_ids")]
 
 # change month to date from Posixct
-predictions[, week := as.Date(week)]
+# predictions[, week := as.Date(week)]
+predictions[, date := as.Date(date)]
 
 # clean predictions
-preds = unique(predictions, by = c("row_ids", "week", "task", "learner", "cv"))
+# preds = unique(predictions, by = c("row_ids", "week", "task", "learner", "cv"))
+preds = unique(predictions, by = c("row_ids", "date", "task", "learner", "cv"))
 preds = na.omit(preds)
 ```
 
@@ -539,9 +557,11 @@ Osim pojedinačnih modela strojnog učenja, koji su korišteni u analizi, u nast
 
 ```{r}
 # prediction to wide format
+# predsw = copy(preds)
+# predsw[, week := data.table::week(date)]
 predsw = dcast(
   preds,
-  task + cv + week + symbol + cv + truth  ~ learner,
+  task + cv + fold + symbol + cv + truth  ~ learner,
   value.var = "response"
 )
 ```
@@ -589,7 +609,7 @@ calculate_msrs = function(t, res) {
 cols = colnames(predsw)
 cols = cols[(which(cols == "truth")+1):which(cols == "sum_resp")]
 preds_perf = melt(predsw, 
-                  id.vars = c("task", "cv", "truth", "week", "symbol"),
+                  id.vars = c("task", "cv", "truth", "fold", "symbol"),
                   measure.vars = cols)
 ```
 
@@ -598,7 +618,7 @@ preds_perf = melt(predsw,
 #| tbl-cap: "Uspješnost modela"
 
 by_ = c("cv", "variable")
-dt_ = preds_perf[, calculate_msrs(truth, value), by = by_]
+dt_ = na.omit(preds_perf)[, calculate_msrs(truth, value), by = by_]
 # fwrite(dt_, "data/preds_perf.csv")
 ft = qflextable(dt_) |>
     colformat_double()
@@ -636,7 +656,7 @@ Iako prikazane mjere uspješnosti modela daju korisne uvide u performanse pojedi
 # Create portfolio returns
 portfolios = preds_perf[value > 0]
 portfolios = portfolios[
-  , .(dt_ = .(dcast(.SD, week ~ symbol, value.var = "truth"))), 
+  , .(dt_ = .(dcast(.SD, fold ~ symbol, value.var = "truth"))), 
   by = .(cv, variable)]
 portfolios[, dt_ := lapply(dt_, setnafill, fill = 0)]
 portfolios[, portfolio_returns := map(dt_, function(x) Return.portfolio(x))]

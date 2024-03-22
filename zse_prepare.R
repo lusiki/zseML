@@ -60,8 +60,9 @@ setorder(prices, isin, date)
 prices[, date := as.IDate(date)]
 prices[, week := ceiling_date(date, unit = "week") - 1]
 
-# Test if week is fine
+# Checks: a)Test if week is fine b) max date
 prices[, all(week >= date)]
+prices[, max(date)]
 
 # Create a column last_month_day that will be equal to TRUE if date is last day of the month
 prices[, last_week_day := last(date, 1) == date, by = c("isin", "week")]
@@ -76,7 +77,8 @@ data_plot = as.xts.data.table(prices[isin == isin_, .(date, close)])
 plot(data_plot, main = isin_)
 
 #  remove symbols with low number of observations
-threshold = 0.6
+# 0.6 returns 108 symbols; 0.7 returns 91 symbols; 0.75 returns 83 symbols
+threshold = 0.7
 monnb = function(d) { lt = as.POSIXlt(as.Date(d, origin="1900-01-01")); lt$year*52 + lt$mon*4 }
 mondf = function(d1, d2) { as.integer(monnb(d2) - monnb(d1)) }
 diff_in_weeks = prices[, .(monthdiff = mondf(min(date), max(date))), by = "isin"]
@@ -404,6 +406,11 @@ dt[, .(symbol, date, date_rolling, date_ohlcv, week)]
 anyDuplicated(dt, by = c("symbol", "date"))
 anyDuplicated(dt, by = c("symbol", "date_ohlcv"))
 anyDuplicated(dt, by = c("symbol", "date_rolling"))
+
+# Check predictors for last 2 weeks
+dt[date > (max(date)-10)][1:10, 1:10]
+x = dt[date > (max(date)-10)][, colSums(is.na(.SD))]
+x[x > 0]
 
 # remove missing ohlcv
 dt = dt[!is.na(date_ohlcv)]
