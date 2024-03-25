@@ -16,7 +16,7 @@ sign01 = function(x) {
 PATH = "F:/zse/results"
 reg = loadRegistry(PATH, work.dir=PATH)
 
-# used memory
+# Used memory
 reg$status[!is.na(mem.used)]
 reg$status[, max(mem.used, na.rm = TRUE)]
 
@@ -64,17 +64,17 @@ for (i in seq_along(predictions_l)) {
   )
 }
 
-predictions = lapply(predictions_l, function(x) {
-  # length(predictions_l)
-  # x = predictions_l[[7130]]
-  print(length(x$test$response))
-  cbind.data.frame(
-    id = x$id,
-    row_ids = x$test$row_ids,
-    truth = x$test$truth,
-    response = x$test$response
-  )
-})
+# predictions = lapply(predictions_l, function(x) {
+#   # length(predictions_l)
+#   # x = predictions_l[[7130]]
+#   print(length(x$test$response))
+#   cbind.data.frame(
+#     id = x$id,
+#     row_ids = x$test$row_ids,
+#     truth = x$test$truth,
+#     response = x$test$response
+#   )
+# })
 predictions = rbindlist(predictions)
 predictions = merge(predictions_meta, predictions, by = "id")
 predictions = as.data.table(predictions)

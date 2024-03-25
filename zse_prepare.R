@@ -132,7 +132,6 @@ lag_ = 0L
 # Util function that returns most recently saved predictor object
 get_latest = function(predictors) {
   # predictors = "RollingExuberFeatures"
-  # predictors = "PreRollingBidAskFeatures"
   # dir_ls(gsub("/$", "", PATH_PREDICTORS), regexp = paste0("(^", predictors, ".*)"))
   f = file.info(dir_ls(PATH_PREDICTORS, regexp = paste0(".*/", predictors)))
   if (length(f) == 0) {
@@ -144,18 +143,27 @@ get_latest = function(predictors) {
 }
 
 # Help function to import existing data
-f_fread = function(x) tryCatch(fread(get_latest(x)), error = function(e) NULL)
+f_fread = function(x, remove_last_week = TRUE) {
+  # x = "RollingGpdFeatures"
+  # dt_ = tryCatch(fread(get_latest(x)), error = function(e) NULL)
+  dt_ = tryCatch(fread(get_latest(x)), error = function(e) NULL)
+  if (remove_last_week == TRUE) {
+    weeks = dt_[, unique(ceiling_date(date, unit = "week") - 1)]
+    last_week = tail(sort(weeks), 2)[1]
+    return(dt_[date < last_week])
+  } else {
+    return(dt_)
+  }
+}
 
 # Import existing data based on strategy
 RollingBackCusumFeatures    = f_fread("RollingBackCusumFeatures")
 RollingExuberFeatures       = f_fread("RollingExuberFeatures")
 RollingForecatsFeatures     = f_fread("RollingForecatsFeatures")
-RollingGpdFeatures          = f_fread("RollingGpdFeatures")
 RollingTheftCatch22Features = f_fread("RollingTheftCatch22Features")
 RollingTheftTsfelFeatures   = f_fread("RollingTheftTsfelFeatures")
 RollingTsfeaturesFeatures   = f_fread("RollingTsfeaturesFeatures")
 RollingWaveletArimaFeatures = f_fread("RollingWaveletArimaFeatures")
-RollingFracdiffFeatures     = f_fread("RollingFracdiffFeatures")
 
 # Util function for identifying missing dates and create at_ object
 get_at_ = function(predictors) {
@@ -181,7 +189,7 @@ get_at_ = function(predictors) {
 }
 
 # Help function to create file name
-create_file_name = function(name, pre = FALSE) {
+create_file_name = function(name) {
   time_ = format.POSIXct(Sys.time(), format = "%Y%m%d%H%M%S")
   file_ = paste0(name, "-", time_, ".csv")
   file_ = path(PATH_PREDICTORS, file_)
@@ -338,15 +346,13 @@ if (length(at_) > 0) {
 }
 
 # Import existing data based on strategy
-RollingBackCusumFeatures    = f_fread("RollingBackCusumFeatures")
-RollingExuberFeatures       = f_fread("RollingExuberFeatures")
-RollingForecatsFeatures     = f_fread("RollingForecatsFeatures")
-RollingGpdFeatures          = f_fread("RollingGpdFeatures")
-RollingTheftCatch22Features = f_fread("RollingTheftCatch22Features")
-RollingTheftTsfelFeatures   = f_fread("RollingTheftTsfelFeatures")
-RollingTsfeaturesFeatures   = f_fread("RollingTsfeaturesFeatures")
-RollingWaveletArimaFeatures = f_fread("RollingWaveletArimaFeatures")
-RollingFracdiffFeatures     = f_fread("RollingFracdiffFeatures")
+RollingBackCusumFeatures    = f_fread("RollingBackCusumFeatures", FALSE)
+RollingExuberFeatures       = f_fread("RollingExuberFeatures", FALSE)
+RollingForecatsFeatures     = f_fread("RollingForecatsFeatures", FALSE)
+RollingTheftCatch22Features = f_fread("RollingTheftCatch22Features", FALSE)
+RollingTheftTsfelFeatures   = f_fread("RollingTheftTsfelFeatures", FALSE)
+RollingTsfeaturesFeatures   = f_fread("RollingTsfeaturesFeatures", FALSE)
+RollingWaveletArimaFeatures = f_fread("RollingWaveletArimaFeatures", FALSE)
 
 # Merge all features test
 rolling_predictors = Reduce(

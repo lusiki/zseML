@@ -17,7 +17,7 @@ library(mlr3batchmark)
 
 # SETUP -------------------------------------------------------------------
 # PARAMETERS
-LIVE = FALSE
+LIVE = TRUE
 
 # snake to camel
 snakeToCamel <- function(snake_str) {
@@ -47,7 +47,7 @@ print("Prepare data")
 # read predictors
 if (interactive()) {
   # fs::dir_ls("data")
-  DT = fread("data/zse-predictors-20240320.csv")
+  DT = fread("data/zse-predictors-20240322.csv")
 } else {
   DT = fread("zse-predictors-20240320.csv")
 }
@@ -102,7 +102,11 @@ DT[symbol == "HRHT00RA0005", .(symbol, date, returns, close, target)]
 DT[, .(symbol, date, returns, close, target)]
 
 # remove observations with missing target
-DT = na.omit(DT, cols = "target")
+if (LIVE) {
+  print(DT[is.na(target) & date > (max(date) - 5), .(date, target)])
+  DT[is.na(target) & date > (max(date) - 5), target := 0] 
+}
+DT = na.omit(DT, cols = "target")  
 
 # Sort by date
 DT = DT[order(date)]
@@ -535,10 +539,11 @@ designs_l = lapply(custom_cvs, function(cv_) {
 })
 designs = do.call(rbind, designs_l)
 
-# # try plain benchmark
-# bmr = benchmark(designs[16], store_models = TRUE)
-# bmr_dt = as.data.table(bmr)
-# bmr_dt$prediction
+# try plain benchmark
+bmr = benchmark(designs[15], store_models = TRUE)
+bmr_dt = as.data.table(bmr)
+bmr_dt$prediction
+
 # bmr_dt$learner[[1]]$state$model$tuning_instance$archive
 # bmr_dt$learner[[1]]$state$model$learner$state$model$regr.ranger
 # cols_test = bmr_dt$learner[[1]]$state$model$learner$state$model$relief$outtasklayout
