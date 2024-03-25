@@ -17,7 +17,7 @@ library(mlr3batchmark)
 
 # SETUP -------------------------------------------------------------------
 # PARAMETERS
-LIVE = TRUE
+LIVE = FALSE
 
 # snake to camel
 snakeToCamel <- function(snake_str) {
@@ -106,7 +106,7 @@ if (LIVE) {
   print(DT[is.na(target) & date > (max(date) - 5), .(date, target)])
   DT[is.na(target) & date > (max(date) - 5), target := 0] 
 }
-DT = na.omit(DT, cols = "target")  
+DT = na.omit(DT, cols = "target")
 
 # Sort by date
 DT = DT[order(date)]
@@ -446,7 +446,7 @@ designs_l = lapply(custom_cvs, function(cv_) {
   # Choose cv inner indecies we want to use
   if (LIVE) {
     # ind_ = (cv_inner$iters-1):cv_inner$iters
-    ind_ = 1:2
+    ind_ = cv_inner$iters
   } else {
     if (interactive()) {
       ind_ = (cv_inner$iters-1):cv_inner$iters
@@ -540,7 +540,7 @@ designs_l = lapply(custom_cvs, function(cv_) {
 designs = do.call(rbind, designs_l)
 
 # try plain benchmark
-bmr = benchmark(designs[15], store_models = TRUE)
+bmr = benchmark(designs[7], store_models = TRUE)
 bmr_dt = as.data.table(bmr)
 bmr_dt$prediction
 
