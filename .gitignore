@@ -8,3 +8,5 @@ finml_results_cache/
 finml_results_files/
 zse_ml_paper_files
 zse_ml_paper_cache
+experiments_live
+data/*

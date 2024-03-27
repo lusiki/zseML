@@ -17,7 +17,7 @@ library(mlr3batchmark)
 
 # SETUP -------------------------------------------------------------------
 # PARAMETERS
-LIVE = FALSE
+LIVE = TRUE
 
 # snake to camel
 snakeToCamel <- function(snake_str) {
@@ -649,7 +649,7 @@ if (LIVE) {
   # load registry
   # reg = loadRegistry("experiments_live", writeable = TRUE)
   # test 1 job
-  result = testJob(1, external = TRUE, reg = reg)
+  # result = testJob(1, external = TRUE, reg = reg)
   
   # get nondone jobs
   ids = findNotDone(reg = reg)

@@ -1,0 +1,157 @@
+---
+title: "ZseML Live"
+author: "Mislav Sagovac"
+format: html
+editor: visual
+---
+
+```{r}
+library(data.table)
+library(fs)
+library(lubridate)
+library(flextable)
+library(ggplot2)
+library(PerformanceAnalytics)
+library(mlr3batchmark)
+library(matrixStats)
+library(mlr3misc)
+```
+
+```{r}
+# Set up
+PATH = "C:/Users/Mislav/Documents/GitHub/zseML/experiments_live"
+```
+
+```{r}
+#| cache: true
+
+# Load registry
+reg = loadRegistry(PATH, work.dir=PATH)
+
+# Done ids
+ids = findDone(reg=reg)
+
+# Get metadata for done jobs
+tabs = getJobTable(ids, reg = reg)
+tabs = tabs[, .SD, .SDcols = c("job.id", "job.name", "repl", "prob.pars", 
+                               "algo.pars")]
+predictions_meta = cbind.data.frame(
+  id = tabs[, job.id],
+  task = vapply(tabs$prob.pars, `[[`, character(1L), "task_id"),
+  learner = gsub(".*regr.|.tuned", "", 
+                 vapply(tabs$algo.pars, `[[`, character(1L), "learner_id")),
+  cv = gsub("custom_|_.*", "", 
+            vapply(tabs$prob.pars, `[[`, character(1L), "resampling_id")),
+  fold = gsub("custom_\\d+_", "", 
+              vapply(tabs$prob.pars, `[[`, character(1L), "resampling_id"))
+)
+
+predictions_l = lapply(ids[[1]], function(id_) {
+  # id_ = 1
+  x = tryCatch({readRDS(fs::path(PATH, "results", id_, ext = "rds"))},
+               error = function(e) NULL)
+  if (is.null(x)) {
+    print(id_)
+    return(NULL)
+  }
+  x = x$prediction
+  x["id"] = id_
+  x
+})
+predictions = lapply(predictions_l, function(x) {
+  # x = predictions_l[[1]]
+  cbind.data.frame(
+    id = x$id,
+    row_ids = x$test$row_ids,
+    truth = x$test$truth,
+    response = x$test$response
+  )
+})
+predictions = rbindlist(predictions)
+predictions = merge(predictions_meta, predictions, by = "id")
+predictions = as.data.table(predictions)
+
+# Import tasks
+tasks_files = dir_ls(fs::path(PATH, "problems"))
+tasks = lapply(tasks_files, readRDS)
+names(tasks) = lapply(tasks, function(t) t$data$id)
+
+# add backend to predictions
+backend_l = lapply(tasks, function(tsk_) {
+  x = tsk_$data$backend$data(1:tsk_$data$nrow, 
+                             c("symbol", "date", "..row_id", "target"))
+  setnames(x, "..row_id", "row_ids")
+  x
+})
+backends = rbindlist(backend_l, fill = TRUE)
+
+# merge predictions and backends
+predictions = backends[predictions, on = c("row_ids")]
+
+# change month to date from Posixct
+# predictions[, week := as.Date(week)]
+predictions[, date := as.Date(date)]
+
+# clean predictions
+# preds = unique(predictions, by = c("row_ids", "week", "task", "learner", "cv"))
+preds = unique(predictions, by = c("row_ids", "date", "task", "learner", "cv"))
+preds = na.omit(preds)
+```
+
+```{r}
+# Extract start and end dates
+start_date = predictions[, min(date)]
+end_date   = predictions[, max(date)]
+# Equal ?
+```
+
+```{r}
+predsw = dcast(
+  preds,
+  task + cv + fold + symbol + cv + truth  ~ learner,
+  value.var = "response"
+)
+```
+
+```{r}
+# Ensambles
+cols = colnames(predsw)
+cols = cols[(which(cols == "truth")+1):ncol(predsw)]
+p = predsw[, ..cols]
+p[, glmnet := NULL]
+pm = as.matrix(p)
+predsw = cbind(predsw, mean_resp = rowMeans(p, na.rm = TRUE))
+predsw = cbind(predsw, median_resp = rowMedians(pm, na.rm = TRUE))
+predsw = cbind(predsw, sum_resp = rowSums2(pm, na.rm = TRUE))
+predsw = cbind(predsw, iqrs_resp = rowIQRs(pm, na.rm = TRUE))
+predsw = cbind(predsw, sd_resp = rowMads(pm, na.rm = TRUE))
+predsw = cbind(predsw, q9_resp = rowQuantiles(pm, probs = 0.9, na.rm = TRUE))
+predsw = cbind(predsw, max_resp = rowMaxs(pm, na.rm = TRUE))
+predsw = cbind(predsw, min_resp = rowMins(pm, na.rm = TRUE))
+predsw = cbind(predsw, all_sell = rowAlls(pm < 0, na.rm = TRUE))
+predsw = cbind(predsw, sum_buy = rowSums2(pm >= 0, na.rm = TRUE))
+predsw = cbind(predsw, sum_sell = rowSums2(pm < 0, na.rm = TRUE))
+```
+
+```{r}
+cols = colnames(predsw)
+cols = cols[(which(cols == "truth")+1):which(cols == "sum_resp")]
+preds_perf = melt(predsw, 
+                  id.vars = c("task", "cv", "truth", "fold", "symbol"),
+                  measure.vars = cols)
+```
+
+```{r}
+portfolio = preds_perf[variable == "mean_resp" & cv == "1058"]
+portfolio = portfolio[, .(symbol, value)]
+portfolio = portfolio[value > 0]
+portfolio
+```
+
+```{r}
+# Save
+file_name = strftime(end_date, "%Y%m%d")
+file_name = paste0("zseml-", file_name, ".csv")
+file_name = file.path("F:/zse/live", file_name)
+fwrite(preds_perf, file_name)
+```

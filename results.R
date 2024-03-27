@@ -13,7 +13,8 @@ sign01 = function(x) {
 }
 
 # load registry
-PATH = "F:/zse/results"
+# PATH = "F:/zse/results"
+PATH = "C:/Users/Mislav/Documents/GitHub/zseML/experiments_live"
 reg = loadRegistry(PATH, work.dir=PATH)
 
 # Used memory
