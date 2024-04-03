@@ -34,7 +34,7 @@ set_flextable_defaults(
   layout = "autofit"
 )
 gg_theme = theme(axis.title.x = element_blank())
-PATH = "F:/zse/results"
+PATH = "F:/zse/results_week"
 TYPE = "predictions" # can be predictions and models
 TARGETS = "target"
 ```
@@ -113,17 +113,13 @@ last_date = strftime(prices[, max(date)], format = "%d.%m.%Y.")
 
 # Uvod
 
-Široka primjena modela strojnog učenja nije zaobišla područje investiranja i trgovanja dionicama. Sposobnost modela strojnog učenja da obrade velike skupove podataka i otkriju složene, nelinearne obrasce ponašanja učinila ih je korisnim alatima za investitore i istraživače. Ovaj rad istražuje primjenu modela strojnog učenja za predviđanje očekivanih prinosa dionica u Hrvatskoj, koristeći trgovinske podatke s Zagrebačke burze (ZSE) od 2000. do 2024. Večina istraživanja ovog tipa primjenjena su na razvijena tržišta kapitala. Budući daje hrvatsko trćište kapitala relativno nelikvidno i plitko, moguće je da modeli strojnog učenja pokazuju veću učinkovitost u predviđanju budućih povrata u dnosu na iste modele primjenjene na razvijenim tržištima kapitala. Drugim riječima, zbog većog stupnja nesavršenosti na hrvatskom tržištu kapitala, modeli strojnog učenja mogu potencijalno prepoznavati obrasce koji postoje duže nego na razvijenim tržištima.
+Široka primjena modela strojnog učenja nije zaobišla područje investiranja i trgovanja dionicama. Sposobnost modela strojnog učenja da obrade velike skupove podataka i otkriju složene, nelinearne obrasce ponašanja učinila ih je korisnim alatima za investitore i istraživače. Ovaj rad istražuje primjenu modela strojnog učenja za predviđanje očekivanih prinosa dionica u Hrvatskoj, koristeći trgovinske podatke s Zagrebačke burze (ZSE) od 2000. do 2024. Večina istraživanja ovog tipa primjenjena su na razvijena tržišta kapitala. Budući daje hrvatsko tržište kapitala relativno nelikvidno i plitko, moguće je da modeli strojnog učenja pokazuju veću učinkovitost u predviđanju budućih povrata u odnosu na iste modele primjenjene na razvijenim tržištima kapitala. Drugim riječima, zbog većog stupnja nesavršenosti na hrvatskom tržištu kapitala, modeli strojnog učenja mogu potencijalno prepoznavati obrasce koji postoje duže nego na razvijenim tržištima.
 
-Osim primjene metodolgije temeljene na strojnom učenju na malo, plitko tržište, ovo istraživanje uvodi i nove prediktore u funkciju predviđanja. Koristi se veliki skup prediktora izvedenih iz dnevnih podataka o trgovanju, za sve dionice koje su kotirale na Zagrebačkoj burzi. Skup podataka podvrgava se rigoroznoj predobradi kako bi se osigurala njegova prikladnost za modele strojnog učenja. Takva pomna priprema podataka ključna je za pouzdanost predikcija strojnog učenja @Pavlidis2016. Novost je i primjena drugačijih metoda filtrianja prediktora, u odnosu na metode koje se koriste u drugim radovima. Koriste se dvije metode filtrianja. Prva metoda, JMI, je bazirana na filtriranju zajedničkih informacija. Druga metoda, relief, je bazirana na informacijskoj entropiji (@Kononenko1994). Ove metode filtriranja prediktora su odabrane jer su pokazale visoku učinkovitost u smanjenju dimenzionalnosti podataka, a time i povećanju učinkovitosti modela strojnog učenja (@Pavlidis2016).
+Osim primjene metodolgije temeljene na strojnom učenju na malo, plitko tržište, ovo istraživanje uvodi i nove prediktore u funkciju predviđanja. Koristi se veliki skup prediktora izvedenih iz dnevnih podataka o trgovanju, za sve dionice koje su kotirale na Zagrebačkoj burzi. Skup podataka podvrgava se rigoroznoj predobradi kako bi se osigurala njegova prikladnost za modele strojnog učenja. Takva pomna priprema podataka ključna je za pouzdanost predikcija strojnog učenja @Pavlidis2016. Novost je i primjena drugačijih metoda filtrianja prediktora, u odnosu na metode koje se koriste u drugim radovima. Koriste se dvije metode filtrianja. Prva metoda, JMI, je bazirana na filtriranju zajedničkih informacija. Druga metoda, relief, je bazirana na informacijskoj entropiji (@Kononenko1994). Ove metode filtriranja prediktora su odabrane jer su pokazale visoku učinkovitost u smanjenju dimenzionalnosti podataka, a time i povećanju učinkovitosti modela strojnog učenja (@Pavlidis2016). 
 
-Primjena strojnog učenja je novo, ali brzorastućo područje investicijske analize. Lopez de Prado [@lopezdeprado2018] naglašava ključnu ulogu strojnog učenja u modernim financijama. U svojoj široko poznatoj knjizi, pruža broje savjete za praktičnu primjenu financijskog strojnog učenja, od pripreme i filtriranja podataka, opzimizacije modela do backtestinga.
+Primjena strojnog učenja je novo, ali brzorastućo područje investicijske analize. Lopez de Prado [@lopezdeprado2018] naglašava ključnu ulogu strojnog učenja u modernim financijama. U svojoj široko poznatoj knjizi, pruža broje savjete za praktičnu primjenu financijskog strojnog učenja, od pripreme i filtriranja podataka, opzimizacije modela do backtestinga. A seminal work by @KellyXiu2023 provides an exhaustive review of the integration of machine learning within financial studies. Their work encapsulates the breadth of machine learning's applicability, ranging from asset pricing and portfolio management to risk assessment and regulatory compliance. This review article serves as a cornerstone for scholars and practitioners alike, offering insights into both the theoretical underpinnings and practical implementations of machine learning techniques in finance. Gu, Kelly, i Xiu (2020) u svom radu "Empirical Asset Pricing via Machine Learning" razmatraju primjenu metoda strojnog učenja na empirijsko određivanje cijena imovine, gdje istražuju kako tehnike strojnog učenja mogu identificirati i iskoristiti složene obrasce u podacima za predviđanje prinosa. Njihova analiza pokazuje da strojno učenje može značajno unaprijediti preciznost modela cijena imovine, doprinoseći boljem razumijevanju dinamike tržišta i otkrivanju novih faktora rizika i prinosa. Aloud, Tsang i Olsen (2021) istraživali su upotrebu genetskih algoritama za optimizaciju strategija zaštite od rizika u upravljanju portfeljem, demonstrirajući kako strojno učenje može poboljšati tradicionalne financijske prakse kroz adaptivne i dinamične modele. S druge strane, Feng, Giglio i Xiu (2020) bavili su se izazovom 'zoo faktora' u određivanju cijena imovine, primjenjujući strojno učenje za evaluaciju i selekciju ekonomski značajnih faktora, što dovodi do razvoja učinkovitijih modela za predviđanje prinosa. Nuij i suradnici (2019) koristili su obradu prirodnog jezika za analizu novinskih članaka s ciljem procjene tržišnog sentimenta, što je primjer kako dubinska analiza nestrukturiranih podataka može unaprijediti predikcije tržišnih kretanja. Rad Hestona i Sinhe [@hestonsinha] istražuje prediktivnu moć sentimenta vijesti o povratima dionica, otkrivajući vremensku dinamiku utjecaja vijesti, što se izravno usklađuje s fokusom na razumijevanje utjecaja vanjskih informacija na financijska tržišta. Osim toga, nalazi Shaikha i sur. [@shaikhetal] otkrivaju potencijal korištenja strojnog učenja za predviđanje kretanja tržišta dionica, naglašavajući rastući interes za korištenje naprednih računalnih tehnika za financijsko prognoziranje. Dodatno, rad Zhao, Bose, i Maher (2021) istražuju specifičnu primjenu s    trojnog učenja u predviđanju trendova cijena dionica. Kroz detaljnu analizu povijesnih podataka o cijenama dionica i primjenu različitih algoritama strojnog učenja, autori demonstriraju sposobnost ovih tehnika da efikasno predviđaju kretanja na tržištu, naglašavajući važnost modeliranja vremenskih serija i analize sentimenta za povećanje točnosti predviđanja. Ovi radovi zajedno naglašavaju ključnu ulogu strojnog učenja u predviđanju viška prinosa, koristeći napredne tehnike za bolje razumijevanje i iskorištavanje složenih obrazaca na financijskim tržištima.
 
-Nadalje, "Predviđanje tržišta dionica korištenjem strojnog učenja" [@stockmarketpredictionML] istražuje primjenu algoritama strojnog učenja za prognoziranje cijena dionica, dodatno učvršćujući važnost tehnika temeljenih na podacima u financijskoj analizi.
-
-Rad Hestona i Sinhe [@hestonsinha] istražuje prediktivnu moć sentimenta vijesti o povratima dionica, otkrivajući vremensku dinamiku utjecaja vijesti, što se izravno usklađuje s fokusom na razumijevanje utjecaja vanjskih informacija na financijska tržišta. Osim toga, nalazi Shaikha i sur. [@shaikhetal] otkrivaju potencijal korištenja strojnog učenja za predviđanje kretanja tržišta dionica, naglašavajući rastući interes za korištenje naprednih računalnih tehnika za financijsko prognoziranje.
-
-Rezultati pokazuju da modeli strojnog učenja imaju visoku učinkovitost u predviđanju očekivanih prinosa dionica na Zagrebačkoj burzi. Pritome postoji velik razlika u uspješnosti modela. Modeli stabla odlučivanja i slučajnih šuma pokazuju veću učinkovitost od penalizirajučih regresijskih modela i neuronskih mreža. Ansambli modela (medijan i prosjek predikcija) pokazuju bolje rezultate od pojedinačnih modela. Osim toga, rezultati pokazuju da su novi prediktori, koji su konstruirani na temelju dnevnih podataka o trgovanju, ključni za postizanje visoke učinkovitosti modela strojnog učenja.
+Rezultati istraživanja pokazuju da modeli strojnog učenja imaju visoku učinkovitost u predviđanju očekivanih prinosa dionica na Zagrebačkoj burzi. Pri tome postoji velika razlika u uspješnosti modela. Modeli stabla odlučivanja i slučajnih šuma pokazuju veću učinkovitost od penalizirajučih regresijskih modela i neuronskih mreža. Ansambli modela (medijan i prosjek predikcija) pokazuju bolje rezultate od pojedinačnih modela. Osim toga, rezultati pokazuju da su novi prediktori, koji su konstruirani na temelju dnevnih podataka o trgovanju, ključni za postizanje visoke učinkovitosti modela strojnog učenja.
 
 Rezultati ovog istraživanja mogu biti korisni za investitore, ali i za regulatorna tijela koja nadziru tržište kapitala. Investitori bi mogli koristiti rezultate ovog istraživanja za donošenje investicijskih odluka, dok bi regulatorna tijela mogla koristiti rezultate za nadzor tržišta kapitala. Osim toga, rezultati ovog istraživanja mogli bi biti korisni i za istraživače koji se bave primjenom modela strojnog učenja u financijama. Ovo istraživanje može poslužiti kao polazna točka za daljnja istraživanja koja se bave primjenom modela strojnog učenja na malim, plitkim tržištima kapitala.
 
@@ -138,7 +134,7 @@ Na podacima su poduzeti uobičajeni postupci čiščenja podataka:
 -   eliminirane su sve duple vrijednosti. Drugim riječima, simbol (ISIN) i datum moraju biti unikatni kroz cijeli uzorak.
 -   eliminirane su sve opservacije gdje je cijena potencijalno manja od 1e-008.
 -   u uzorku su ostavljeni samo simboli koji imaju najmanje 2 godine podataka. Ovaj uvjet je nužan jer se kod računanja prediktora koriste dugački prozori.
--   nedostajuće vrijednosti za zadnje cijene su zamjenjene prosječnim vrijednostima.
+-   nedostajuće vrijednosti za zadnje cijene su zamjenjene prosječnim vrijednostima za isti bar.
 -   budući da se pojedinim simbolima malo trguje, iz uzorka su izbačeni simboli za koje je udio broja trgovinskih dana u ukupnom broju mogućih trgovinskih dana najmanje 70%.
 
 ```{r}
@@ -161,9 +157,7 @@ set_table_properties(
 
 Nakon svih potonjih prilagodbi, ukupni uzorak sadrži `r n` opservacija. U tablici @tbl-sample-data je prikazano prvih pet redova OHLCV podataka.
 
-Na temelju dnevnih OHLCV podataka, konstruirani su prediktori koji se koriste u treniranju modela strojnog učenja. Prediktori su konstruirani na temelju dnevnih podataka, a zatim agregirani na tjednu razinu. U modeliranju se na kraju koristi tjedna frekvencija s tjednim horizontom. Budući da se radi o velikom broju prediktora, u tablici su prikazani opisi grupe prediktora, kao i R i python paketi pomoću kojih su konstruirani. Prvu grupu čine testovi eksplozivnosti univarijantnih vremenskih nizova. Više o ovoj grupi možete pronaći u Pavlidis et al. [@Pavlidis2016], Phillips et al. [@Phillips2015] i Vasilopoulos et al. [@Vasilopoulos2022]. Druga grupa uključuje kreiranje predviđanja na temelju tri univarijantna modela: ARIMA, ETS i NNETAR. Više o ovim modelima moežete pronaći u Hyndman et al. [@Hyndman2008forecast]. sljedeća grupa prediktora uključuje testove strukturnog loma. Više o ovim testovima možete pronaći u [@OttoBreitung2022]. Preostale grupe uključuju prediktore izračunate pomoću programskih paketa koji su razvijeni za generiranje prediktora za analizu vremenskih serija. To uključuje sljedeće grupe: kanoničke karakteristike vremenskih serija ([@Lubba2019]), korištenje paketa za automatsku ekstrakciju prediktora ([@feasts2023], [@tsfeatures2023], [@barandas2020tsfel]). Sljedeća grupa sadrži predviđanja generirana iz Wavelet transformacija ([@WaveletArima2022], [@AMINGHAFARI2007]). Na kraju, autor je napravio svoj funkciju unutar finfeatures R paketa, koja računa brojne preditkore uključujući tehničke indikatore, statistike prinosa na pomičnim prozorima i volatilnosti [@finfeatures2023].
-
-Kod za izračun prediktora dostupan je na GitHub stranici[^1]
+Na temelju dnevnih OHLCV podataka, konstruirani su prediktori koji se koriste u treniranju modela strojnog učenja. Prediktori su konstruirani na temelju dnevnih podataka, a zatim agregirani na tjednu razinu. U modeliranju se na kraju koristi tjedna frekvencija s tjednim horizontom. Budući da se radi o velikom broju prediktora, u tablici su prikazani opisi grupe prediktora, kao i R i python paketi pomoću kojih su konstruirani. Prvu grupu čine testovi eksplozivnosti univarijantnih vremenskih nizova. Više o ovoj grupi možete pronaći u Pavlidis et al. [@Pavlidis2016], Phillips et al. [@Phillips2015] i Vasilopoulos et al. [@Vasilopoulos2022]. Druga grupa uključuje kreiranje predviđanja na temelju tri univarijantna modela: ARIMA, ETS i NNETAR. Više o ovim modelima moežete pronaći u Hyndman et al. [@Hyndman2008forecast]. Sljedeća grupa prediktora uključuje testove strukturnog loma. Više o ovim testovima možete pronaći u [@OttoBreitung2022]. Preostale grupe uključuju prediktore izračunate pomoću programskih paketa koji su razvijeni za generiranje prediktora za analizu vremenskih serija. To uključuje sljedeće grupe: kanoničke karakteristike vremenskih serija ([@Lubba2019]), korištenje paketa za automatsku ekstrakciju prediktora ([@feasts2023], [@tsfeatures2023], [@barandas2020tsfel]). Sljedeća grupa sadrži predviđanja generirana iz Wavelet transformacija ([@WaveletArima2022], [@AMINGHAFARI2007]). Na kraju, autor je napravio svoju funkciju unutar finfeatures R paketa, koja računa brojne prediktore uključujući tehničke indikatore, statistike prinosa na pomičnim prozorima i volatilnosti [@finfeatures2023]. Kod za izračun prediktora dostupan je na GitHub stranici[^1]
 
 [^1]: Poveznica na kod: <https://github.com/MislavSag/finfeatures>
 
@@ -212,6 +206,7 @@ reg = loadRegistry(PATH, work.dir=PATH)
 
 # Done ids
 ids = findDone(reg=reg)
+ids_notdone = findNotDone(reg=reg)
 
 # Get metadata for done jobs
 tabs = getJobTable(ids, reg = reg)
@@ -502,13 +497,13 @@ set_table_properties(
 )
 ```
 
-Osim uglađivanja parametara pojedinih modela, u ovom radu koristit ćemo i različite tehnike predobrade podataka kako bismo poboljšali kvalitetu i performanse modela. U tablici @tbl-preprocessing-params prikazane su i tehnike predobrade podataka koje će se koristiti prije svake procjene parametara modela. U Prije svakog modela, koristit će se sljedeće preprocesne radnje: 1) Brisanje kolona koje imaju više od 5% nedostajućih vrijednosti. 2) Brisanje opservacija koje imaju nedostajuće vrijednosti. 3) Brisanje konstantnih kolona. 4) *Winsorizacija* podataka. Winsorizacija ograničava ekstremne vrijednosti na određene percentilne vrijednosti, čime se smanjuje njihov utjecaj na model. Ovaj korak je dio prilagođavanja podataka kako je opsiano u tablici @tbl-tuning-params. 5) Odbacivanje visoko koreliranih značajki, koja smanjuje redundanciju u podacima postavljanjem praga korelacije iznad kojeg značajke smatramo previše sličnima i stoga jednu od njih odbacujemo. Ovaj korak je također dio prilagođavanja podataka kako je opsiano u tablici @tbl-tuning-params. 6) Uniformiyacija podataka. 7) Filtriranje prediktora pomoću dva filtera JMI i Relief, koje nam omogućavaju da se fokusiram samo na one prediktore koje pružaju najviše informacija za predviđanje.
+Osim uglađivanja parametara pojedinih modela, u ovom radu koristit ćemo i različite tehnike predobrade podataka kako bismo poboljšali kvalitetu i performanse modela. U tablici @tbl-preprocessing-params prikazane su i tehnike predobrade podataka koje će se koristiti prije svake procjene parametara modela. Prije svakog modela, koristit će se sljedeće preprocesne radnje: 1) Brisanje kolona koje imaju više od 5% nedostajućih vrijednosti. 2) Brisanje opservacija koje imaju nedostajuće vrijednosti. 3) Brisanje konstantnih kolona. 4) *Winsorizacija* podataka. Winsorizacija ograničava ekstremne vrijednosti na određene percentilne vrijednosti, čime se smanjuje njihov utjecaj na model. Ovaj korak je dio prilagođavanja podataka kako je opsiano u tablici @tbl-tuning-params. 5) Odbacivanje visoko koreliranih značajki, koja smanjuje redundanciju u podacima postavljanjem praga korelacije iznad kojeg značajke smatramo previše sličnima i stoga jednu od njih odbacujemo. Ovaj korak je također dio prilagođavanja podataka kako je opsiano u tablici @tbl-tuning-params. 6) Uniformiyacija podataka. 7) Filtriranje prediktora pomoću dva filtera JMI i Relief, koje nam omogućavaju da se fokusiram samo na one prediktore koje pružaju najviše informacija za predviđanje.
 
 Nakon predobrade, usredotočujemo se na optimizaciju hiperparametara modela. Za modele poput Random Foresta, XGBoost, neuronskih mreža i GLMNeta, pažljivo biramo raspon hiperparametara za istraživanje. Za Random Forest, na primjer, podešavamo maksimalnu dubinu stabala, omjer varijabli dostupnih za razdvajanje na svakom čvoru, broj stabala, i da li uzorkovanje treba biti s zamjenom ili bez. U slučaju XGBoost, optimiziramo parametre poput stope učenja, maksimalne dubine, broja iteracija pojačavanja, i omjera uzorkovanja. Za neuronske mreže, fokusiramo se na broj jedinica u skrivenim slojevima, parametar smanjenja težine i maksimalan broj iteracija. Za GLMNet, optimizacija uključuje podešavanje ElasticNet miješajućeg parametra i L1 regularizacije.
 
 Optimizacija hiperparametara provodi se kroz postupak ugniježđene unakrsne validacije, gdje unutarnji sloj služi za podešavanje hiperparametara, dok vanjski sloj procjenjuje performanse modela s optimalnim hiperparametrima. Ovaj pristup osigurava da naša evaluacija modela bude nepristrana i da dobro generalizira na neviđene podatke.
 
-Kroz ovaj temeljit proces, naš cilj je razviti modele koji nisu samo prilagođeni trenutnim podacima, već su i sposobni generalizirati i performirati dobro na širokom rasponu scenarija, čime se osigurava njihova praktična primjenjivost i robustnost.
+Kroz ovaj temeljit proces, cilj je razviti modele koji nisu samo prilagođeni trenutnim podacima, već su i sposobni generalizirati i performirati dobro na širokom rasponu scenarija, čime se osigurava njihova praktična primjenjivost i robustnost.
 
 # Rezultati
 
@@ -530,14 +525,15 @@ measures <- c("Točnost (acc)",
               "Srednja Kvadratna Greška (MSE)", 
               "Srednja Apsolutna Greška (MAE)")
 
-interpretations <- c("Ukazuje na opću točnost modela. Može biti varljiva u nebalansiranim skupovima podataka.",
-                     "Balansira preciznost i odziv. β > 1 daje veću važnost odzivu, dok β < 1 daje veću važnost preciznosti.",
-                     "Proporcija stvarno pozitivnih ispravno identificiranih. Ne uzima u obzir lažne pozitivne.",
-                     "Proporcija ispravno identificiranih pozitivnih. Važno kada su lažni pozitivni skupi.",
-                     "Proporcija stvarno negativnih ispravno identificiranih. Važno za ispravno predviđanje negativnih.",
-                     "Proporcija ispravno identificiranih negativnih rezultata. Korisno u medicinskom testiranju.",
-                     "Mjeri kvalitetu predikatora. Niže vrijednosti ukazuju na bolje pristajanje. Osjetljivo na izvanredne vrijednosti.",
-                     "Mjeri prosječnu veličinu grešaka u skupu predikcija, bez razmatranja njihovog smjera. Manje osjetljivo na izvanredne vrijednosti od MSE.")
+interpretations <- c(
+  "Ukazuje na opću točnost modela. Može biti varljiva u nebalansiranim skupovima podataka.",
+  "Balansira preciznost i odziv. β > 1 daje veću važnost odzivu, dok β < 1 daje veću važnost preciznosti.",
+  "Proporcija stvarno pozitivnih ispravno identificiranih. Ne uzima u obzir lažne pozitivne.",
+  "Proporcija ispravno identificiranih pozitivnih. Važno kada su lažni pozitivni skupi.",
+  "Proporcija stvarno negativnih ispravno identificiranih. Važno za ispravno predviđanje negativnih.",
+  "Proporcija ispravno identificiranih negativnih rezultata. Korisno u medicinskom testiranju.",
+  "Mjeri kvalitetu predikatora. Niže vrijednosti ukazuju na bolje pristajanje. Osjetljivo na izvanredne vrijednosti.",
+  "Mjeri prosječnu veličinu grešaka u skupu predikcija, bez razmatranja njihovog smjera. Manje osjetljivo na izvanredne vrijednosti od MSE.")
 
 # Combine into a data.frame
 performance_measures_df = data.frame(Mjera = measures, Interpretacija = interpretations)
@@ -561,7 +557,7 @@ Osim pojedinačnih modela strojnog učenja, koji su korišteni u analizi, u nast
 # predsw[, week := data.table::week(date)]
 predsw = dcast(
   preds,
-  task + cv + fold + symbol + cv + truth  ~ learner,
+  task + cv + fold + date + symbol + cv + truth  ~ learner,
   value.var = "response"
 )
 ```
@@ -607,9 +603,9 @@ calculate_msrs = function(t, res) {
 
 ```{r}
 cols = colnames(predsw)
-cols = cols[(which(cols == "truth")+1):which(cols == "sum_resp")]
+cols = cols[(which(cols == "truth")+1):which(cols == "median_resp")]
 preds_perf = melt(predsw, 
-                  id.vars = c("task", "cv", "truth", "fold", "symbol"),
+                  id.vars = c("task", "cv", "date", "truth", "fold", "symbol"),
                   measure.vars = cols)
 ```
 
@@ -627,38 +623,51 @@ set_table_properties(
   width = 1,
   layout = "autofit"
 )
-
 ```
 
 Analizom rezultata u tablici @tbl-performance uočavamo da postoji značajna varijacija u performansama između različitih modela strojnog učenja - glmnet, nnet, ranger, xgboost i ansambl modela. Svaki model pokazuje svoje specifične snage i slabosti u odnosu na različite evaluacijske metrike.
 
-Započnimo s modelom glmnet. Ovi modeli imaju relativno visoku stopu točnih pozitiva (TPR), što znači da su efikasni u identificiranju pozitivnih slučajeva. Međutim, njihova preciznost je niža u usporedbi s drugim modelima, što ukazuje na veći broj lažno pozitivnih rezultata. To može biti prihvatljivo u situacijama gdje je važnije ne propustiti pozitivne slučajeve nego što je važno smanjiti broj lažno pozitivnih.
+Največu točnost pokazuje model nnet (neorinske mreže). Međutim, razlika između modela nije jako velika. Najlošije rezultate po pokazatelju točnosti pokazuje glmnet. Opčenito možemo zaključiti da rezultati svih modela pokazuju relativnost niske performanse. Ovo potvrđuje niski omjer signala i šuma u financijskim podacima, što čini predviđanje kretanja cijena dionica izazovnim zadatkom. Fbeta je pokazatelj koji se vrlo često koristi kod binarnih klasifikacija. Kod ove mjere, najlošrije rezultate pokazuje nnet, koji je pokazivao najbolje rezultate po točnosti. Nijedan model se ne ističe posebno prema mjeri fbeta. Sljedeće dvije mjere otkrivaju mnogo predviđanjima koje generiraju modeli. Mjera tpr je visoka kod svih modela, dok je mjera precision niska. Ovo ukazuje na to da modeli često predviđaju pozitivne klase, ali su te predikcije često pogrešne. To potvrđuje i tablica @tbl-predictions-positive koja pokazuje udio pozitivnih predviđanja u ukupnom broju predviđanja. Vidljivo je da svi modeli imaju mnogo više pozitivnih nego negativnih predikcija.
+Kada se analiziraju rezultati prema regresijskim mjerama, najbolje rezulate pokazuju modeli ranger, glmnet i medain_resp. Ovi modeli imaju najmanje srednje kvadratne greške i srednje apsolutne greške.
 
-Modeli nnet pokazuju bolju ravnotežu između stope točnih pozitiva (TPR) i preciznosti. To ukazuje na to da su manje skloni generiranju lažno pozitivnih rezultata dok još uvijek održavaju solidnu sposobnost identificiranja pozitivnih slučajeva. Ova ravnoteža čini nnet modele potencijalno prikladnijima za primjene gdje su i lažno pozitivni i lažno negativni rezultati problematični.
+```{r}
+#| label: tbl-predictions-positive
+#| tbl-cap: "Udio pozitivnih predviđanja"
 
-Model ranger, s druge strane, ima performanse slične nnet modelima u pogledu TPR i preciznosti, ali s nešto boljim rezultatima u nekim metrikama. To može ukazivati na njihovu veću efikasnost u specifičnim scenarijima ili na određenim skupovima podataka.
+# Calculate the proportion of positive predictions
+positive_preds = preds_perf[, .N, by = .(variable, prediction_positive = value > 0)]
+positive_preds = positive_preds[, pr := round(N / sum(N) * 100, 2), by = variable]
+positive_preds = dcast(positive_preds, variable ~ prediction_positive, value.var = "pr")
+setnames(positive_preds, c("Model",
+                           "Udio negativnih vrijednosti", 
+                           "Udio pozitivnih vrijednosti"))
+ft = qflextable(positive_preds) |>
+    colformat_double()
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
+```
 
-Ansambl modeli pokazuju relativno slične performanse. Preciznost i točnost im je identična, dok postoji vrlo mala razlika u TPR i NPV. Ansambl modeli ne pokazuju značajno bolje rezultate u odnosu na pojedinačne modele, barem kada se kao mjere koriste mjere za klasifikacijsje modele.
-
-Gledajući mjere pogrešaka za regesijske model, MSE i MAE pokazuju kako se različiti modeli nose s greškama u svojim predviđanjima. Iako nnet modeli pokazuju veći MSE u jednom slučaju, što može ukazivati na veću osjetljivost na iznimke, njihove vrijednosti MAE su relativno niske, sugerirajući da su njihova predviđanja u prosjeku bliže stvarnim vrijednostima. Gledajući u cjelini, glmnet modeli imaju nešto bolje rezultate MAE, što može ukazivati na njihovu veću konzistentnost u predviđanjima.
-
-U kontekstu izbora modela za specifičnu strategiju trgovanja, važno je razmotriti kako se različite metrike usklađuju s investicijskim ciljevima. Na primjer, ako je cilj maksimalno smanjiti lažno negativne rezultate, modeli s visokim TPR-om kao što su glmnet mogli bi biti preferirani. S druge strane, ako je prioritet minimizirati pogreške u predviđanju, moglo bi biti bolje odabrati model s nižim MSE i MAE vrijednostima.
-
-Ako uspredimo rezultate s obzirom na dva pristupa krićžne validacije, možemo uočiti da su rezultati nešto bolji za klrižne validacije koje koriste kraće razdoblje treniranja i validacije. Ovo može ukazivati na to da su modeli osjetljiviji na promjene u podacima, te da je potrebno češće ažuriranje modela kako bi se održala njihova uspješnost.
-
-U zaključku, detaljna analiza i usporedba modela glmnet, nnet i ranger pokazuje da nema univerzalno najboljeg modela; umjesto toga, izbor modela trebao bi biti vođen specifičnim zahtjevima i ograničenjima investicijske strategije. Razumijevanje prednosti i slabosti svakog modela ključno je za optimizaciju performansi strojnog učenja u različitim primjenama.
+U zaključku, detaljna analiza i usporedba modela pokazuje da nema univerzalno najboljeg modela; umjesto toga, izbor modela trebao bi biti vođen specifičnim zahtjevima i ograničenjima investicijske strategije. Razumijevanje prednosti i slabosti svakog modela ključno je za optimizaciju performansi strojnog učenja u različitim primjenama.
 
 ## Backtest
 
-Iako prikazane mjere uspješnosti modela daju korisne uvide u performanse pojedinih modela, one ne daju uvid u performanse modela u kontekstu investicijske strategije. Kako bi se dobio bolji uvid u performanse modela, u ovom dijelu ćemo provesti jednostavan backtest invesicijske stategija. Backtest je simulacija performansi investicijske strategije na povijesnim podacima. U ovom radu, investicijska strategija je konstruiranje portfolia dugih pozicija s tjednim rebalansiranjem. Portfolij se konstruira na temelju predviđanja modela, a svaki tjedan se rebalansira na temelju novih predviđanja.
+Prikazane mjere uspješnosti modela daju korisne uvide u performanse pojedinih modela, no ne daju uvid u performanse modela u kontekstu investicijske strategije. Kako bi se dobio bolji uvid u performanse modela, u ovom dijelu ćemo provesti jednostavan backtest invesicijskih stategija. Backtest je simulacija performansi investicijske strategije na povijesnim podacima. U ovom radu, investicijska strategija je konstruiranje portfolia dugih pozicija s tjednim rebalansiranjem. Portfolio se konstruira na temelju predviđanja modela, a svaki tjedan se rebalansira na temelju novih predviđanja.
 
 ```{r}
 # Create portfolio returns
 portfolios = preds_perf[value > 0]
+portfolios[, fold := as.integer(fold)]
+# portfolios = portfolios[cv == 1057]
 portfolios = portfolios[
-  , .(dt_ = .(dcast(.SD, fold ~ symbol, value.var = "truth"))), 
+  , .(dt_ = .(dcast(.SD, fold + date ~ symbol, value.var = "truth"))), 
   by = .(cv, variable)]
 portfolios[, dt_ := lapply(dt_, setnafill, fill = 0)]
+portfolios[, dt_ := lapply(dt_, function(x) as.xts.data.table(x[, .SD, .SDcols = -"fold"]))]
+
+Return.portfolio(portfolios[2, dt_][[1]])
 portfolios[, portfolio_returns := map(dt_, function(x) Return.portfolio(x))]
 ```
 
@@ -709,7 +718,7 @@ set_table_properties(
 )
 ```
 
-Tablica @tbl-portfolio-performance prikazuje statističke mjere portfolia za svaki model i svaku ugniježđenu metodu križne validacije. Usporedbom statističkih mjera portfolia možemo dobiti uvid u performanse investicijske strategije koja trguje na temelju korištenih modela.
+Tablica @tbl-portfolio-performance prikazuje statističke mjere portfolia za svaki model i svaku ugniježđenu metodu križne validacije. Usporedbom statističkih mjera portfolia možemo dobiti uvid u performanse investicijske strategije koja trguje na temelju korištenih modela. Mjere uključuju godišnje povrate, godišnju standardnu devijaciju, Sharpeov omjer, maksimalni gubitak i Sortinov omjer.
 
 ```{r}
 #| label: tbl-portfolio-performance-sr
@@ -732,13 +741,11 @@ set_table_properties(
 
 Budući da se kao mjera uspješnosti portfolia u literaturi najčešće koristi Sharpeov omjer, kreirana je i posebna talbia koja pokazuje samo Sharpeov omjer za svaki model, pri čemu je uzet prosjek rezultata po križnim validacijama. Rezultati su dani u tablici @tbl-portfolio-performance-sr.
 
-Modeli glmnet pokazuju najniže godišnje povrate (11% i 12%) s prilično niskom godišnjom standardnom devijacijom (0,11 i 0,13), što rezultira najmanjim Sharpeovim omjerom (0,95 i 0,92) i Sortinovim omjerom (0,21 i 0,20). Ako kao uspješnost koristimo Sharpov omjer, nakon glmnet-a, po uspješnosti slijede nnet i ranger. Modeli nnet pokazuju poboljšanje u godišnjim povratima (0,14 i 0,17) uz sličnu ili nešto veću standardnu devijaciju u usporedbi s modelima glmnet. Sharpeov i Sortinov omjer su bolji (1,28 i 1,08 za Sharpeov omjer te 0,32 i 0,25 za Sortinov omjer). Modeli ranger pokazuju još veće godišnje povrate (0,22 i 0,20) s većom godišnjom standardnom devijacijom (0,19 i 0,16), ali i dalje zadržavaju prilično visoke Sharpeove i Sortinove omjere (1,16 i 1,24 za Sharpeov omjer te 0,28 i 0,30 za Sortinov omjer). To sugerira da ranger modeli dobro upravljaju rizikom, pružajući pritom solidne povrate. Modeli xgboost imaju slične godišnje povrate kao nnet modeli, ali s nižom godišnjom standardnom devijacijom, što rezultira najvišim Sharpeovim omjerom među pojedinačnim modelima (1,33 i 1,28) i solidnim Sortinovim omjerima (0,31 i 0,30). Ovo ukazuje na to da xgboost modeli pružaju najbolju ravnotežu između rizika i povrata.
+Modeli glmnet pokazuju najniže godišnje povrate (0% i 8%) s prilično niskom godišnjom standardnom devijacijom (0,08 i 0,09), što rezultira najmanjim Sharpeovim omjerom (0,01 i 0,43) i Sortinovim omjerom (0,04 i 0,01). Ako kao uspješnost koristimo Sharpov omjer, nakon glmnet-a, po uspješnosti slijede xgboost i mean?resp Modeli xgboost pokazuju poboljšanje u godišnjim povratima (10% i 15%) uz sličnu ili nešto nižu standardnu devijaciju u usporedbi s modelima glmnet. Sharpeov i Sortinov omjer su bolji (0,86 i 1,08 za Sharpeov omjer te 0,07 i 0,11 za Sortinov omjer). Modeli mean_resp pokazuju još veće godišnje povrate (19% i 24%) s većom godišnjom standardnom devijacijom (0,07 i 0,10), ali i dalje zadržavaju prilično visoke Sharpeove i Sortinove omjere (1,08 i 1,21 za Sharpeov omjer te 0,11 i 0,14 za Sortinov omjer). Ansambl median_resp pokazuje još bolje rezultate. To sugerira da ansambl modeli dobro upravljaju rizikom, pružajući pritom solidne povrate. Najbolji model po godišnjem povratu je ranger (random forest) sa 27% prinosa i godišnjom standardnom devijacijom od 0,09. Ipak najbolje rezultate po Sharpeovom omjeru pokazuje neuronska mreža (nnet) sa 22% godišnjim povratima i godišnjom standardnom devijacijom od 0,07. Ovaj model ima Sharpeov omjer 1,53 i Sortinov omjer 0,13. Modeli ranger i nnet pokazuju i znatno bolje rezultate po pitanju rizika. Maksimlani gubitak im je znatno manji od ostalih modela (oko 45%).
 
-Ansambl modeli mean_resp, median_resp i sum_resp pokazuju visoke godišnje povrate (0,18 i 0,19) s relativno niskom godišnjom standardnom devijacijom, što rezultira vrlo visokim Sharpeovim omjerima i Sortinovim omjerima. Dakle, anasambl pojedinačnih modela daju bolje rezultate od pojedinačnih modela. Pri tome prosjek predikcija daje bolje rezultate od medijana predikcija.
+Ukratko, tablica pruža uvid u to kako različiti modeli balansiraju između rizika i povrata. Modeli s visokim Sharpeovim i Sortinovim omjerima, kao što su ranger i nnet, izgledaju kao najprivlačnije opcije za investitore koji traže optimalnu ravnotežu između rizika i mogućih povrata.
 
-Ukratko, tablica pruža uvid u to kako različiti modeli balansiraju između rizika i povrata. Modeli s visokim Sharpeovim i Sortinovim omjerima, kao što su xgboost i mean_resp, izgledaju kao najprivlačnije opcije za investitore koji traže optimalnu ravnotežu između rizika i mogućih povrata.
-
-Radi laše predodžbe o performansama portfolia, prikazat ćemo i grafikon koji prikazuje povrat portfolia kroz vrijeme. Radi bolje usporedbe, prikazat ćemo povrat portfolia za svaki model i svaku ugniježđenu metodu križne validacije.
+Radi laše predodžbe o performansama portfolia, prikazat ćemo i grafikon koji prikazuje povrat portfolia kroz vrijeme. Radi bolje usporedbe, prikazat ćemo povrat portfolia za svaki model. Svaki mjesec je konstruiran *lon-only* portfolio koji se sastoji od dionica koje su predviđene kao pozitivne. Portfolio se rebalansira svaki tjedan. Portfolio daje iste težine svakoj dionici.
 
 ```{r}
 #| label: fig-portfolio-returns
@@ -747,7 +754,7 @@ Radi laše predodžbe o performansama portfolia, prikazat ćemo i grafikon koji 
 # Merge all returns to DT
 equity_curves = Reduce(function(x, y) cbind(x, y), portfolios[, portfolio_returns])
 colnames(equity_curves) = portfolios[, paste0(variable, "_", cv)]
-equity_curves = equity_curves[, seq(2, ncol(equity_curves)-2, 2)]
+equity_curves = equity_curves[, seq(2, ncol(equity_curves), 2)]
 chart.CumReturns(equity_curves, plot.engine = "ggplot2") +
   theme_minimal() +
   gg_theme + 
@@ -755,9 +762,19 @@ chart.CumReturns(equity_curves, plot.engine = "ggplot2") +
   
 ```
 
-Slika @fig-portfolio-returns prikazuje krivulje kapitala portfolia za svaki model. Prikazani su rezultati za samo jednu verziju križne validacije (s 1194 foldova). Uočavamo da su krivulje kapitala portfolia za modele ranger i mean_resp najviše, što je u skladu s rezultatima iz tablice @tbl-portfolio-performance-sr. Ovo sugerira da su ranger i mean_resp modeli najbolji izbor za investitore koji traže optimalnu ravnotežu između rizika i mogućih povrata. NA slici se vidi da nedostaju neke opservacije za GLMNET model jer model u nekim razdobljima predviđa iskljičivo pad cijena dionica, pa sukladno tome ne drži nikakve pozicije.
+Slika @fig-portfolio-returns prikazuje krivulje kapitala portfolia za svaki model. Prikazani su rezultati za samo jednu verziju križne validacije (s 1057 foldova). Uočavamo da su krivulje kapitala portfolia za modele mean_resp i median_resp najviše, što upučuje na drugačije rezultateu u odnosu na one prikazane u tablici @tbl-portfolio-performance-sr. Ovo sugerira da su median_resp i mean_resp modeli najbolji izbor za investitore koji traže optimalnu ravnotežu između rizika i mogućih povrata. Na slici se vidi da nedostaju neke opservacije za GLMNET model jer model u nekim razdobljima predviđa iskljičivo pad cijena dionica, pa sukladno tome ne drži nikakve pozicije.
 
 # Zaključak
+
+U radu su primjeni modeli strojnog učenja unutar domene predviđanja prinosa dionica, s posebnim fokusom na hrvatsko tržište dionica. Kroz iscrpno ispitivanje podataka o trgovanju s Zagrebačke burze u razdoblju od 2000. do 2024. godine, istraživanje osvjetljava značajan potencijal koji modeli strojnog učenja imaju u predviđanju očekivanih prinosa dionica, posebno unutar relativno nelikvidnih i plitkih tržišta poput hrvatskog. Inovativna uključivanost širokog spektra prediktora izvedenih iz dnevnih podataka o trgovanju, zajedno s rigoroznom predobradom podataka, naglašava ključnu važnost metodičke pripreme u poboljšanju prediktivne učinkovitosti modela strojnog učenja.
+
+Nalazi otkrivaju nijansirani krajolik performansi modela, pri čemu *radnom forest* i neuronska mreža pokazuju bolje rezultate od ostalih modela. Evidentna visoka učinkovitost modela strojnog učenja u predviđanju prinosa dionica na ZSE pruža uvjerljiv argument za njihovo usvajanje u financijskom predviđanju.
+
+Primjena naprednih metodologija poput Ugniježđene metode križne validacije s pomičnim prozorom (NRWCV) dodatno je doprinijela robustnom okviru evaluacije, naglašavajući sofisticiranost i preciznost potrebnu u prediktivnom modeliranju vremenskih serija. Naše istraživanje ne samo da je demonstriralo održivost modela strojnog učenja u financijskom predviđanju, već je također istaknulo dinamičku interakciju između odabira modela, pripreme podataka i prediktivne izvedbe.
+
+Zaključno, dok put do postizanja visoke točnosti u predviđanjima prinosa dionica ostaje zahtjevan, naša studija nudi vrijedne uvide i čvrstu osnovu za buduće istraživačke pothvate u ovom području. Za investitore, regulatorna tijela i znanstvenike, implikacije našeg istraživanja nadilaze teoretski interes, predstavljajući praktične primjene u odlučivanju o investicijama i nadzoru tržišta. Ovo istraživanje moguće je proširiti na različite načine. Moguće je doati nove modele, eksperimentirati sa duljinom prozora za trenirnje ili testiranje, kreirati različite načine rebalansiranj portfolia i kreiranja portfolia. Moguće je doadavti nove prediktore, te kreirati nove oblike filtriranja prediktora. Očekujem da će nadolazeća istraživanja dodatno razotkriti sposobnosti i ograničenja ovih modela, otvarajući put za njihovu poboljšanu primjenu u stalno evoluirajućem području financijske analize.
+
+
 
 # Literatura
 

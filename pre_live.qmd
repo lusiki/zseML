@@ -142,9 +142,10 @@ preds_perf = melt(predsw,
 ```
 
 ```{r}
-portfolio = preds_perf[variable == "mean_resp" & cv == "1058"]
+portfolio = preds_perf[variable == "mean_resp"]
 portfolio = portfolio[, .(symbol, value)]
 portfolio = portfolio[value > 0]
+setorder(portfolio, -value)
 portfolio
 ```
 

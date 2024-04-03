@@ -46,8 +46,14 @@ print("Prepare data")
 
 # read predictors
 if (interactive()) {
-  # fs::dir_ls("data")
-  DT = fread("data/zse-predictors-20240322.csv")
+  if (LIVE) {
+    files_ = fs::dir_ls("data")
+    last_file_ind = as.Date(gsub(".*-|\\.csv", "", files_), format = "%Y%m%d")
+    last_file_ind = which.max(last_file_ind)
+    DT = fread(files_[last_file_ind])
+  } else {
+    DT = fread("data/zse-predictors-20240322.csv") 
+  }
 } else {
   DT = fread("zse-predictors-20240320.csv")
 }
@@ -540,9 +546,9 @@ designs_l = lapply(custom_cvs, function(cv_) {
 designs = do.call(rbind, designs_l)
 
 # try plain benchmark
-bmr = benchmark(designs[7], store_models = TRUE)
-bmr_dt = as.data.table(bmr)
-bmr_dt$prediction
+# bmr = benchmark(designs[7], store_models = TRUE)
+# bmr_dt = as.data.table(bmr)
+# bmr_dt$prediction
 
 # bmr_dt$learner[[1]]$state$model$tuning_instance$archive
 # bmr_dt$learner[[1]]$state$model$learner$state$model$regr.ranger
