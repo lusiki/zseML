@@ -62,6 +62,7 @@ prices[, week := ceiling_date(date, unit = "week") - 1]
 
 # Checks: a)Test if week is fine b) max date
 prices[, all(week >= date)]
+prices[, diff(sort(unique(week))) == 7]
 prices[, max(date)]
 
 # Create a column last_month_day that will be equal to TRUE if date is last day of the month

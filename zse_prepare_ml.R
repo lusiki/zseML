@@ -44,7 +44,7 @@ PATH_RESULTS = "F:/zse/results"
 # PREPARE DATA ------------------------------------------------------------
 print("Prepare data")
 
-# read predictors
+# Read predictors
 if (interactive()) {
   if (LIVE) {
     files_ = fs::dir_ls("data")
@@ -58,7 +58,7 @@ if (interactive()) {
   DT = fread("zse-predictors-20240320.csv")
 }
 
-# convert tibble to data.table
+# Convert tibble to data.table
 setDT(DT)
 
 # Remove week, maybe this will help with no predictions in last fold

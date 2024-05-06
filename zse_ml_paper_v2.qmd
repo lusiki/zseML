@@ -101,6 +101,11 @@ hist(symbols_keep[, keep])
 symbols_keep[keep > threshold]
 prices = prices[isin %chin% symbols_keep[keep > threshold, isin]]
 
+# rolling standard deviation
+setorder(prices, isin, date)
+prices[, returns := close / shift(close) - 1, by = isin]
+prices[, roll_sd := roll::roll_sd(returns, 22), by = isin]
+
 ```
 
 ```{r}
@@ -558,7 +563,7 @@ Osim pojedinačnih modela strojnog učenja, koji su korišteni u analizi, u nast
 # predsw[, week := data.table::week(date)]
 predsw = dcast(
   preds,
-  task + cv + fold + week + date + symbol + cv + truth  ~ learner,
+  task + cv + fold + week + date + symbol + truth  ~ learner,
   value.var = "response"
 )
 ```
@@ -585,7 +590,7 @@ predsw = cbind(predsw, sum_sell = rowSums2(pm < 0, na.rm = TRUE))
 ```
 
 ```{r}
-# Calculat measures help function
+# Calculate measures help function
 sign01 = function(x) as.factor(ifelse(x > 0, 1, 0))
 calculate_msrs = function(t, res) {
   t_sign   = sign01(t)
@@ -608,6 +613,10 @@ cols = cols[(which(cols == "truth")+1):which(cols == "median_resp")]
 preds_perf = melt(predsw, 
                   id.vars = c("task", "cv", "week", "date", "truth", "fold", "symbol"),
                   measure.vars = cols)
+
+# Merge rolling sd from prices to the preds_perf
+preds_perf = prices[, .(symbol = isin, date, date_prices = date, roll_sd)][
+  preds_perf, on = c("symbol", "date"), roll = +Inf]
 ```
 
 ```{r}
@@ -673,85 +682,47 @@ Prikazane mjere uspješnosti modela daju korisne uvide u performanse pojedinih m
 # portfolios[, portfolio_returns := map(dt_, function(x) Return.portfolio(x))]
 ############## BUG ################
 # preds_perf[, weigts_equal := , by = .(date)]
-head(preds_perf, 20)
 
 # Define weights for equal, prediction and prediction + volatility portfolios
 portfolios = preds_perf[, .(
  weights_equal      = ifelse(value > 0, 1 / nrow(.SD[value > 0]), 0),
  weights_prediction = ifelse(value > 0, value / .SD[value > 0, sum(value)], 0),
+ weights_vol        = ifelse(value > 0, (roll_sd / .SD[value > 0, sum(roll_sd, na.rm = TRUE)]), 0),
  truth
 ), by = .(cv, variable, week)]
 
 # Calculate portfolio returns
 portfolio_returns = portfolios[, .(
   returns_equal = sum(weights_equal * truth),
-  returns_preds = sum(weights_prediction * truth)
-),by = .(cv, variable, week)]
-setorder(portfolio_returns, cv, variable, week)
-```
-
-```{r}
-calculatePortfolioStats <- function(portfolioReturns) {
-  # portfolioReturns = portfolios[, portfolio_returns][[1]] # OLD WAY
-  portfolioReturns = copy(portfolio_equal)
-  portfolioReturns = as.xts.data.table(portfolioReturns[, .(week, returns)])
-  # Ensure the input is an xts or time series object
-  if (!is.xts(portfolioReturns)) {
-    stop("portfolioReturns must be an xts object.")
-  }
-  
-  # Calculate statistics
-  annualizedReturn = Return.annualized(portfolioReturns)[[1]]
-  annualizedSD = sqrt(52) * sd(portfolioReturns)
-  sharpeRatio = SharpeRatio.annualized(portfolioReturns)[[1]]
-  maxDrawdown = maxDrawdown(portfolioReturns)
-  sortinoRatio = SortinoRatio(portfolioReturns)[[1]]
-
-  # Create data.table from statistics
-  portfolio_perf = data.table(
-    "Godišnji povrati" = annualizedReturn,
-    `Godišnja SD` = annualizedSD,
-    `Sharpov omjer` = sharpeRatio,
-    `Maksimalni gubitak` = maxDrawdown,
-    `Sortinov omjer` = sortinoRatio
-  )
-  
-  return(portfolio_perf)
-}
+  returns_preds = sum(weights_prediction * truth),
+  returns_vol   = sum(weights_vol * truth, na.rm = TRUE)
+),by = .(cv, variable, week)] 
+portfolio_returns = melt(portfolio_returns, 
+                         id.vars = c("cv", "variable", "week"),
+                         variable.name = "weights",
+                         value.name =  "returns")
+setorder(portfolio_returns, cv, variable, weights, week)
 ```
 
 ```{r}
 #| label: tbl-portfolio-performance
 #| tbl-cap: "Statističke mjere portfolia"
 
-# # Calculate portfolio statistics
-# portfolio_stats = portfolios[, .(lapply(portfolio_returns, function(x) calculatePortfolioStats(x)))]
-# portfolio_stats = rbindlist(portfolio_stats[[1]])
-# portfolio_stats = rcbind(portfolios[, .(Model = variable, CV = cv)], portfolio_stats)
-# 
-# # Flextable
-# ft = qflextable(portfolio_stats) |>
-#   colformat_double()
-# set_table_properties(
-#   ft,
-#   width = 1,
-#   layout = "autofit"
-# )
-
-
+# Portfolio returns
 calculatePortfolioStats <- function(portfolio_ret) {
-  # portfolio_ret = portfolio_returns[cv == 1057 & variable == "median_resp", .(week, returns_equal)]
+  # portfolio_ret = portfolio_returns[cv == 1057 & variable == "median_resp" & weights == "returns_vol",
+  # .(week, returns)]
   portfolio_ret = as.xts.data.table(portfolio_ret)
-  if (!is.xts(portfolioReturns)) {
+  if (!is.xts(portfolio_ret)) {
     stop("portfolioReturns must be an xts object.")
   }
   
   # Calculate statistics
-  annualizedReturn = Return.annualized(portfolioReturns)[[1]]
-  annualizedSD = sqrt(52) * sd(portfolioReturns)
-  sharpeRatio = SharpeRatio.annualized(portfolioReturns)[[1]]
-  maxDrawdown = maxDrawdown(portfolioReturns)
-  sortinoRatio = SortinoRatio(portfolioReturns)[[1]]
+  annualizedReturn = Return.annualized(portfolio_ret)[[1]]
+  annualizedSD = sqrt(52) * sd(portfolio_ret)
+  sharpeRatio = SharpeRatio.annualized(portfolio_ret)[[1]]
+  maxDrawdown = maxDrawdown(portfolio_ret)
+  sortinoRatio = SortinoRatio(portfolio_ret)[[1]]
 
   # Create data.table from statistics
   portfolio_perf = data.table(
@@ -764,11 +735,17 @@ calculatePortfolioStats <- function(portfolio_ret) {
   
   return(portfolio_perf)
 }
+portfolio_stats = portfolio_returns[, calculatePortfolioStats(.SD[, .(week, returns)]), 
+                                    by = .(cv, variable, weights)]
 
-portfolio_returns[1:5000, calculatePortfolioStats(.SD[, .(week, returns_equal)]), 
-                  by = .(cv, variable)]
-
-
+# Flextable
+ft = qflextable(portfolio_stats) |>
+  colformat_double()
+set_table_properties(
+  ft,
+  width = 1,
+  layout = "autofit"
+)
 ```
 
 Tablica @tbl-portfolio-performance prikazuje statističke mjere portfolia za svaki model i svaku ugniježđenu metodu križne validacije. Usporedbom statističkih mjera portfolia možemo dobiti uvid u performanse investicijske strategije koja trguje na temelju korištenih modela. Mjere uključuju godišnje povrate, godišnju standardnu devijaciju, Sharpeov omjer, maksimalni gubitak i Sortinov omjer.
@@ -779,7 +756,7 @@ Tablica @tbl-portfolio-performance prikazuje statističke mjere portfolia za sva
 
 # Portfolio SR
 portfolio_stats_sr = portfolio_stats[, .("Sharpov omjer" = mean(`Sharpov omjer`)), 
-                                     by = Model]
+                                     by = variable]
 setorder(portfolio_stats_sr, "Sharpov omjer")
 
 # Flextable
@@ -805,14 +782,20 @@ Radi laše predodžbe o performansama portfolia, prikazat ćemo i grafikon koji 
 #| caption: "Krivulja kapitala portfolia"
 
 # Merge all returns to DT
-equity_curves = Reduce(function(x, y) cbind(x, y), portfolios[, portfolio_returns])
-colnames(equity_curves) = portfolios[, paste0(variable, "_", cv)]
-equity_curves = equity_curves[, seq(2, ncol(equity_curves), 2)]
-chart.CumReturns(equity_curves, plot.engine = "ggplot2") +
-  theme_minimal() +
-  gg_theme + 
-  labs(title = "Krivulja kapitala portfolia")
-  
+# equity_curves = Reduce(function(x, y) cbind(x, y), portfolios[, portfolio_returns])
+# colnames(equity_curves) = portfolios[, paste0(variable, "_", cv)]
+# equity_curves = equity_curves[, seq(2, ncol(equity_curves), 2)]
+# chart.CumReturns(equity_curves, plot.engine = "ggplot2") +
+#   theme_minimal() +
+#   gg_theme + 
+#   labs(title = "Krivulja kapitala portfolia")
+
+equity_curves = portfolio_returns[cv == 1057 & weights == "returns_vol",
+                                  .(week, variable, returns)]
+equity_curves = dcast(equity_curves, week ~ variable, value.var = "returns")
+setorder(equity_curves, week)
+chart.CumReturns(as.xts.data.table(equity_curves)[, 1], plot.engine = "ggplot2")
+
 ```
 
 Slika @fig-portfolio-returns prikazuje krivulje kapitala portfolia za svaki model. Prikazani su rezultati za samo jednu verziju križne validacije (s 1057 foldova). Uočavamo da su krivulje kapitala portfolia za modele mean_resp i median_resp najviše, što upučuje na drugačije rezultateu u odnosu na one prikazane u tablici @tbl-portfolio-performance-sr. Ovo sugerira da su median_resp i mean_resp modeli najbolji izbor za investitore koji traže optimalnu ravnotežu između rizika i mogućih povrata. Na slici se vidi da nedostaju neke opservacije za GLMNET model jer model u nekim razdobljima predviđa iskljičivo pad cijena dionica, pa sukladno tome ne drži nikakve pozicije.

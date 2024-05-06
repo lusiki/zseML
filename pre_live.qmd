@@ -15,6 +15,7 @@ library(PerformanceAnalytics)
 library(mlr3batchmark)
 library(matrixStats)
 library(mlr3misc)
+library(matrixStats)
 ```
 
 ```{r}
@@ -144,7 +145,6 @@ preds_perf = melt(predsw,
 ```{r}
 portfolio = preds_perf[variable == "mean_resp"]
 portfolio = portfolio[, .(symbol, value)]
-portfolio = portfolio[value > 0]
 setorder(portfolio, -value)
 portfolio
 ```
@@ -155,4 +155,151 @@ file_name = strftime(end_date, "%Y%m%d")
 file_name = paste0("zseml-", file_name, ".csv")
 file_name = file.path("F:/zse/live", file_name)
 fwrite(preds_perf, file_name)
+```
+
+```{r}
+# Import prices
+prices = fread("F:/zse/prices.csv")
+prices[, change := NULL]
+prices = prices[date >= "2000-01-01"]
+prices = unique(prices, by = c("isin", "date"))
+prices = prices[open > 1e-008 & high > 1e-008 & low > 1e-008 & close > 1e-008]
+prices[is.na(close), close := average]
+setorder(prices, isin, date)
+prices[, returns := close / shift(close) - 1]
+prices = na.omit(prices)
+
+# Calculate standard deviation
+prices[, roll_sd := roll::roll_sd(returns, 100), by = isin]
+
+# Filter prices we need
+prices_last = prices[date >= predictions[, min(date)]]
+```
+
+```{r}
+# mean by symbol
+invest = portfolio[, mean(value), by = symbol]
+setorder(invest, -V1)
+
+# correct for standard deviation
+invest = prices_last[invest[, .(isin = symbol, resp = V1)], on = "isin"]
+invest[, resp_sd := resp / roll_sd]
+setorder(invest, -resp_sd)
+
+# choose mannnually
+print(invest)
+# invest = invest[isin %in% c("HRVARTR10005", "HRSPANRA0007", "HRATGRRA0003")]
+
+# amount invested
+capital = 2600
+invest = invest[1:3]
+invest = invest[, weight := resp_sd / sum(resp_sd)]
+invest[, ulozi := capital * weight]
+invest[, .(isin, date, resp, weight, ulozi)]
+```
+
+```{r}
+# Import predictions
+files = dir_ls("F:/zse/live")
+predictions = lapply(files, function(f) {
+  date = as.IDate(gsub(".*-", "", path_ext_remove(path_file(f))),
+                  format = "%Y%m%d")
+  as.data.table(cbind.data.frame(
+    date = date,
+    fread(f)
+  ))
+})
+predictions = rbindlist(predictions)
+predictions[, cv := ifelse(cv > 1000, 1, 0)]
+setnames(predictions, "symbol", "isin")
+setorder(predictions, date, -value)
+predictions[variable == "median_resp" & cv == 1, head(.SD), by = date]
+```
+
+```{r}
+portfolio_res = function(p,
+                         preds,
+                         cvi, 
+                         var, 
+                         type = c("equal", "prediction"),
+                         threshold = 0,
+                         sd_adjust = FALSE,
+                         n = 10) {
+  # p = copy(prices)
+  # preds = copy(predictions)
+  # cvi = 2
+  # var = "sum_resp"
+  # threshold = 0
+  # n = 10
+  # type = "equal"
+  # Arguments
+  type = match.arg(type)
+  
+  # Filter predictions
+  if (cvi == 2) {
+    preds[, cv := 2]
+    preds = preds[cv == cvi & variable == var & value > threshold]
+    preds = preds[, .(value = sum(value)), by = .(date, task, cv, isin, variable)]
+  } else {
+    preds = preds[cv == cvi & variable == var & value > threshold] 
+  }
+  setorder(preds, date, -value)
+  preds = preds[, first(.SD, n), by = date]
+  if (type == "equal") {
+    preds[, N := 1 / length(value), by = date]  
+  } else if (type == "prediction") {
+    if (sd_adjust) {
+     preds[, value := value / roll_sd] 
+     preds[, N := value / sum(value), by = date]   
+    } else {
+     preds[, N := value / sum(value), by = date]   
+    }
+  } else {
+    stop("Argument type must be equal or prediction.")
+  }
+  
+  # Volatility standardization
+  # preds[]
+  
+  # Merge prices and predictions
+  dt = preds[p, on = c("isin", "date"), roll = Inf]
+  setorder(dt, date, isin)
+  dt = na.omit(dt, cols = "value")
+  
+  # Calcualte portoflio returns
+  dt = dt[, .(date, isin, value, returns, N)]
+  dt[, weighted_return := returns * N]
+  portfolio_ret = dt[, .(ret = sum(weighted_return)), by = date]
+  return(portfolio_ret[, Return.cumulative(ret)])
+}
+
+```
+
+```{r}
+# p, preds, cvi, var, type = c("equal"), threshold = 0, n = 10
+params = expand.grid(
+  cvi = c(2:0),
+  var = predictions[, unique(variable)],
+  type = c("equal", "prediction"),
+  threshold = c(0, 0.001),
+  n = c(3, 5, 10),
+  sd_adjust = c(TRUE, FALSE),
+  stringsAsFactors = FALSE
+)
+portfolio_results = vapply(1:nrow(params), function(i) {
+  # i = 1
+  params_ = params[i, ]
+  portfolio_res(
+    prices,
+    predictions,
+    cvi = params_$cvi,
+    var = params_$var,
+    type = params_$type,
+    threshold = params_$threshold
+  )  
+}, FUN.VALUE = numeric(1L))
+portfolio_results = cbind.data.frame(params, cum_ret = portfolio_results)
+setDT(portfolio_results)
+setorder(portfolio_results, -cum_ret)
+portfolio_results
 ```
