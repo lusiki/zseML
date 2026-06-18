@@ -1,12 +1,32 @@
+# R project files
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+
+# Large data files
 data/rolling_predictors.csv
 data/zse-predictors*
+data/*.csv
+data/raw/
+
+# Quarto cache and output
 finml_results_cache/
 finml_results_files/
-zse_ml_paper_files
-zse_ml_paper_cache
-experiments_live
-data/*
+paper/zse_ml_paper_files/
+paper/zse_ml_paper_cache/
+paper/finml_results_cache/
+paper/finml_results_files/
+paper/pre_live_cache/
+paper/pre_live_files/
+*_cache/
+*_files/
+
+# Experiment registry (large, local only)
+experiments_live/
+
+# Secrets and credentials
+blob_key.txt
+
+# Commit history dumps (large, not needed in repo)
+commits_*.txt
