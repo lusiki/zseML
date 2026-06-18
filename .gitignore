@@ -9,6 +9,8 @@ data/rolling_predictors.csv
 data/zse-predictors*
 data/*.csv
 data/raw/
+# ...but keep the small committed results
+!data/results/preds_perf.csv
 
 # Quarto cache and output
 finml_results_cache/
@@ -21,6 +23,12 @@ paper/pre_live_cache/
 paper/pre_live_files/
 *_cache/
 *_files/
+
+# Rendered paper outputs in paper/ are working copies; the published versions
+# live in docs/ (served via GitHub Pages). Keep sources (.qmd, .scss) tracked.
+paper/zse_ml_paper.html
+paper/zse_ml_paper.pdf
+.quarto/
 
 # Experiment registry (large, local only)
 experiments_live/

@@ -1,0 +1,154 @@
+/*-- scss:defaults --*/
+// Custom theme for the ZSE ML paper — clean academic look layered on Cosmo.
+
+// Typography
+$font-family-sans-serif: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif !default;
+$font-family-monospace: "JetBrains Mono", "Fira Code", "SFMono-Regular", Menlo, Consolas, monospace !default;
+$font-size-root: 17px !default;
+$line-height-base: 1.65 !default;
+
+// Color palette — deep teal/navy with a warm accent
+$primary: #0b5d6b !default;       // deep teal
+$secondary: #6c757d !default;
+$body-color: #1f2933 !default;
+$link-color: #0b5d6b !default;
+$link-hover-color: #c4661f !default;  // warm accent on hover
+$code-color: #b1361e !default;
+$border-color: #e3e6ea !default;
+
+/*-- scss:rules --*/
+
+// Constrain measure for readability
+.page-columns .content {
+  max-width: 52rem;
+}
+
+// Title block
+#title-block-header {
+  border-bottom: 3px solid $primary;
+  padding-bottom: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+#title-block-header .title {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: $primary;
+}
+
+#title-block-header .subtitle {
+  font-weight: 400;
+  font-style: italic;
+  color: $secondary;
+  font-size: 1.15rem;
+}
+
+.quarto-title-meta {
+  margin-top: 0.5rem;
+}
+
+// Abstract — softly boxed
+.abstract {
+  background: #f6f9fa;
+  border-left: 4px solid $primary;
+  padding: 1.1rem 1.4rem;
+  border-radius: 0 6px 6px 0;
+  margin: 1.5rem 0 2rem;
+  font-size: 0.97rem;
+}
+
+.abstract > .abstract-title,
+.abstract > p:first-child strong {
+  color: $primary;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.8rem;
+}
+
+// Headings
+h1, h2, h3, h4 {
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+h1 {
+  color: $primary;
+  margin-top: 2.5rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid $border-color;
+}
+
+h2 { color: darken($primary, 4%); margin-top: 2rem; }
+h3 { color: lighten($body-color, 12%); }
+
+// Links
+a { text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+// Code blocks
+pre.sourceCode {
+  border: 1px solid $border-color;
+  border-radius: 6px;
+  background: #fbfcfd;
+  font-size: 0.86rem;
+}
+
+code:not(pre code) {
+  background: #f2f4f6;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+
+// Code-fold toggles
+.code-fold > summary,
+details.code-fold > summary {
+  color: $secondary;
+  font-size: 0.85rem;
+}
+
+// Tables
+table {
+  font-size: 0.92rem;
+}
+
+.table > thead {
+  border-bottom: 2px solid $primary;
+}
+
+caption, .quarto-float-caption {
+  color: $secondary;
+  font-size: 0.88rem;
+  font-style: italic;
+}
+
+// Figures
+figure img {
+  border-radius: 6px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+
+// Math display
+.math.display {
+  overflow-x: auto;
+  padding: 0.25rem 0;
+}
+
+// Sidebar TOC
+#TOC {
+  font-size: 0.86rem;
+}
+
+#TOC .active {
+  font-weight: 600;
+  color: $primary;
+}
+
+// References
+#refs {
+  font-size: 0.9rem;
+}
+
+div.csl-entry {
+  margin-bottom: 0.6rem;
+}
