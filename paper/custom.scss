@@ -1,154 +1,618 @@
 /*-- scss:defaults --*/
-// Custom theme for the ZSE ML paper — clean academic look layered on Cosmo.
 
-// Typography
-$font-family-sans-serif: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif !default;
-$font-family-monospace: "JetBrains Mono", "Fira Code", "SFMono-Regular", Menlo, Consolas, monospace !default;
-$font-size-root: 17px !default;
-$line-height-base: 1.65 !default;
+// =============================================================
+// Statecraft palette — paper / ink / verdigris
+// =============================================================
+$brand-navy:        #1C1916;   // body & headings — ink
+$brand-navy-soft:   #6B1F26;   // oxblood — emphasis
+$brand-slate:       #6B6357;   // captions, secondary text
+$brand-gold:        #4A6B5C;   // PRIMARY accent — verdigris
+$brand-light-gold:  #DDE5DF;   // verdigris-wash — subtle bg tint
+$brand-burgundy:    #4A6B5C;   // unified with verdigris
+$brand-cream:       #F2EDE3;   // warm cream background
+$brand-paper:       #EAE3D4;   // elevated surfaces
+$brand-charcoal:    #1C1916;   // ink
+$brand-warm-grey:   #9C9382;   // borders, captions, separators
 
-// Color palette — deep teal/navy with a warm accent
-$primary: #0b5d6b !default;       // deep teal
-$secondary: #6c757d !default;
-$body-color: #1f2933 !default;
-$link-color: #0b5d6b !default;
-$link-hover-color: #c4661f !default;  // warm accent on hover
-$code-color: #b1361e !default;
-$border-color: #e3e6ea !default;
+$sc-verdigris-deep: #3A5648;
+$sc-ochre:          #C8985E;   // archival / accent
+$sc-rule-faint:     rgba(28, 25, 22, 0.07);
+$sc-rule:           rgba(28, 25, 22, 0.14);
+$sc-rule-strong:    rgba(28, 25, 22, 0.30);
+
+// =============================================================
+// Typography — Newsreader / Public Sans / IBM Plex Mono
+// =============================================================
+$brand-font-serif: "Newsreader", "GT Sectra", Georgia, serif;
+$brand-font-sans:  "Public Sans", "Söhne", "Inter", system-ui, sans-serif;
+$brand-font-mono:  "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Public+Sans:ital,wght@0,300..800;1,300..800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+$font-family-base:       $brand-font-sans;
+$font-family-serif:      $brand-font-serif;
+$font-family-sans-serif: $brand-font-sans;
+$font-family-monospace:  $brand-font-mono;
+
+$font-size-root:     16px !default;
+$line-height-base:   1.65 !default;
+
+// Bootstrap colour tokens
+$body-color:    $brand-charcoal !default;
+$body-bg:       $brand-cream !default;
+$primary:       $brand-gold !default;
+$link-color:    $brand-burgundy !default;
+$border-color:  rgba($brand-navy, 0.14) !default;
+
+// Callout border
+$callout-border-width:  3px;
+$callout-border-radius: 3px;
 
 /*-- scss:rules --*/
+
+// =============================================================
+// Body rendering
+// =============================================================
+body {
+  font-family: $brand-font-serif;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1, "onum" 1;
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  hanging-punctuation: first last;
+}
 
 // Constrain measure for readability
 .page-columns .content {
   max-width: 52rem;
 }
 
-// Title block
-#title-block-header {
-  border-bottom: 3px solid $primary;
-  padding-bottom: 1.25rem;
-  margin-bottom: 2rem;
+main p,
+main li,
+main dd {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  text-align: left;
 }
 
-#title-block-header .title {
-  font-weight: 700;
+main p {
+  margin: 0 0 1.1rem 0;
+}
+
+// =============================================================
+// Headings
+// =============================================================
+h1, .chapter-title, .title {
+  font-family: $brand-font-serif;
+  font-weight: 600;
+  color: $brand-navy;
+  letter-spacing: -0.018em;
+  line-height: 1.12;
+}
+
+h2 {
+  font-family: $brand-font-serif;
+  font-weight: 500;
+  color: $brand-navy;
+  letter-spacing: -0.012em;
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba($brand-navy, 0.08);
+  border-bottom: none;
+  padding-bottom: 0;
+  line-height: 1.25;
+}
+
+h3 {
+  font-family: $brand-font-serif;
+  font-weight: 500;
+  color: $brand-navy;
   letter-spacing: -0.01em;
-  color: $primary;
+  margin-top: 2rem;
 }
 
-#title-block-header .subtitle {
-  font-weight: 400;
-  font-style: italic;
-  color: $secondary;
-  font-size: 1.15rem;
+h4, h5, h6 {
+  font-family: $brand-font-sans;
+  font-weight: 600;
+  color: $brand-charcoal;
+  letter-spacing: -0.005em;
 }
 
-.quarto-title-meta {
-  margin-top: 0.5rem;
+// =============================================================
+// Title block
+// =============================================================
+header#title-block-header {
+  position: relative;
+  padding: 2.5rem 0 1.75rem 0;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid rgba($brand-navy, 0.10);
+
+  .quarto-title-meta,
+  .date {
+    font-family: $brand-font-sans;
+    font-size: 0.82rem;
+    color: $brand-slate;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  h1.title {
+    font-family: $brand-font-serif;
+    font-size: 2.4rem;
+    font-weight: 600;
+    line-height: 1.12;
+    margin: 0;
+    color: $brand-navy;
+
+    &::after {
+      content: "";
+      display: block;
+      width: 50px;
+      height: 2px;
+      background: $brand-gold;
+      margin-top: 1.1rem;
+      border-radius: 1px;
+    }
+  }
 }
 
-// Abstract — softly boxed
+// =============================================================
+// Abstract
+// =============================================================
 .abstract {
-  background: #f6f9fa;
-  border-left: 4px solid $primary;
-  padding: 1.1rem 1.4rem;
+  background: rgba($brand-light-gold, 0.35);
+  border: 1px solid rgba($brand-navy, 0.08);
+  border-left: 4px solid $brand-gold;
+  padding: 1.2rem 1.5rem;
   border-radius: 0 6px 6px 0;
   margin: 1.5rem 0 2rem;
+  font-family: $brand-font-serif;
   font-size: 0.97rem;
 }
 
 .abstract > .abstract-title,
 .abstract > p:first-child strong {
-  color: $primary;
+  font-family: $brand-font-sans;
+  color: $brand-gold;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
-// Headings
-h1, h2, h3, h4 {
-  font-weight: 650;
-  letter-spacing: -0.005em;
+// =============================================================
+// Callouts
+// =============================================================
+div.callout {
+  margin: 1.75rem 0;
+  border-radius: 4px;
+  border-left-width: 4px;
+  background: rgba($brand-navy, 0.025);
+  box-shadow: 0 1px 2px rgba($brand-navy, 0.04);
 }
 
-h1 {
-  color: $primary;
-  margin-top: 2.5rem;
-  padding-bottom: 0.3rem;
-  border-bottom: 1px solid $border-color;
+div.callout .callout-header {
+  font-family: $brand-font-sans;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.5rem 0.9rem;
+  background: rgba($brand-navy, 0.04);
 }
 
-h2 { color: darken($primary, 4%); margin-top: 2rem; }
-h3 { color: lighten($body-color, 12%); }
+div.callout .callout-body {
+  padding: 0.6rem 0.9rem 0.8rem;
+  font-size: 0.97rem;
+}
 
+div.callout-note {
+  border-left-color: $brand-navy;
+  .callout-header { background: rgba($brand-navy, 0.07); color: $brand-navy; }
+}
+div.callout-tip {
+  border-left-color: #2F855A;
+  .callout-header { background: rgba(#2F855A, 0.08); color: #1F5C3D; }
+}
+div.callout-important {
+  border-left-color: $brand-gold;
+  .callout-header { background: rgba($brand-gold, 0.10); color: darken($brand-gold, 12%); }
+}
+div.callout-warning {
+  border-left-color: #DD6B20;
+  .callout-header { background: rgba(#DD6B20, 0.08); color: #9C4A0F; }
+}
+
+// =============================================================
+// Tables
+// =============================================================
+table {
+  font-family: $brand-font-sans;
+  font-size: 0.91rem;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1.75rem 0;
+  background: $brand-cream;
+}
+
+table thead th {
+  font-family: $brand-font-sans;
+  font-weight: 600;
+  color: $brand-navy;
+  padding: 0.7rem 0.85rem;
+  text-align: left;
+  border-bottom: 2px solid $brand-navy;
+  background: $brand-cream;
+  letter-spacing: 0.01em;
+}
+
+table tbody td {
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid rgba($brand-slate, 0.10);
+  vertical-align: top;
+}
+
+table tbody tr:nth-child(even) {
+  background: rgba($brand-light-gold, 0.32);
+}
+
+table tbody tr:hover {
+  background: rgba($brand-gold, 0.10);
+  transition: background 0.12s ease;
+}
+
+caption, .quarto-float-caption {
+  font-family: $brand-font-sans;
+  font-size: 0.84rem;
+  color: $brand-slate;
+  caption-side: top;
+  text-align: left;
+  padding-bottom: 0.4rem;
+  font-style: italic;
+}
+
+// kableExtra overrides — match our palette
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+  background-color: rgba($brand-light-gold, 0.32);
+  color: inherit;
+}
+.table > thead {
+  border-bottom: 2px solid $brand-navy;
+}
+
+// =============================================================
+// Figures
+// =============================================================
+.quarto-figure,
+figure.figure,
+figure {
+  margin: 2.25rem auto;
+
+  > p > img,
+  > img,
+  .figure-img {
+    background: $brand-cream;
+    padding: 6px;
+    border: 1px solid rgba($brand-navy, 0.12);
+    border-radius: 2px;
+    box-shadow: 0 2px 8px rgba($brand-navy, 0.06);
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+figure > figcaption,
+.quarto-figure figcaption,
+figure.figure figcaption,
+.figure-caption,
+.quarto-float-caption {
+  position: relative;
+  font-family: $brand-font-serif;
+  font-style: italic;
+  font-size: 0.88rem;
+  color: $brand-slate;
+  text-align: center;
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  line-height: 1.5;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50px;
+    height: 2px;
+    background: $brand-gold;
+    border-radius: 1px;
+  }
+}
+
+// =============================================================
+// Blockquotes
+// =============================================================
+blockquote {
+  border-left: 3px solid $brand-burgundy;
+  padding: 0.4rem 0 0.4rem 1.5rem;
+  margin: 1.75rem 0;
+  color: $brand-charcoal;
+  font-family: $brand-font-serif;
+  font-style: italic;
+  font-size: 1.06rem;
+  line-height: 1.55;
+  text-indent: -0.08em;
+
+  p:last-child { margin-bottom: 0; }
+
+  cite, footer {
+    display: block;
+    margin-top: 0.5rem;
+    font-family: $brand-font-sans;
+    font-style: normal;
+    font-size: 0.85rem;
+    color: $brand-slate;
+    letter-spacing: 0.02em;
+    &::before { content: "— "; }
+  }
+}
+
+// =============================================================
 // Links
-a { text-decoration: none; }
-a:hover { text-decoration: underline; }
+// =============================================================
+a {
+  color: $brand-burgundy;
+  text-decoration: none;
+  border-bottom: 1px solid rgba($brand-warm-grey, 0.45);
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 
-// Code blocks
-pre.sourceCode {
-  border: 1px solid $border-color;
-  border-radius: 6px;
-  background: #fbfcfd;
-  font-size: 0.86rem;
+  &:hover {
+    color: $sc-verdigris-deep;
+    border-bottom-color: $brand-burgundy;
+    background: rgba($brand-burgundy, 0.06);
+  }
+
+  .sidebar &,
+  nav &,
+  .toc &,
+  .quarto-secondary-nav &,
+  .quarto-title-meta &,
+  #TOC & {
+    border-bottom: none;
+  }
+}
+
+// =============================================================
+// Code
+// =============================================================
+code, pre, .sourceCode {
+  font-family: $brand-font-mono;
+  font-feature-settings: "calt" 0, "liga" 0;
 }
 
 code:not(pre code) {
-  background: #f2f4f6;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
+  background: rgba($brand-navy, 0.05);
+  color: $brand-navy-soft;
+  padding: 0.08em 0.32em;
+  border-radius: 3px;
   font-size: 0.88em;
+}
+
+pre, pre.sourceCode {
+  background: #FAF7F0;
+  border: 1px solid rgba($brand-navy, 0.10);
+  border-radius: 4px;
+  padding: 0.85rem 1rem;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  overflow-x: auto;
 }
 
 // Code-fold toggles
 .code-fold > summary,
 details.code-fold > summary {
-  color: $secondary;
-  font-size: 0.85rem;
+  font-family: $brand-font-sans;
+  font-size: 0.82rem;
+  color: $brand-slate;
+  letter-spacing: 0.02em;
 }
 
-// Tables
-table {
-  font-size: 0.92rem;
-}
-
-.table > thead {
-  border-bottom: 2px solid $primary;
-}
-
-caption, .quarto-float-caption {
-  color: $secondary;
-  font-size: 0.88rem;
-  font-style: italic;
-}
-
-// Figures
-figure img {
-  border-radius: 6px;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-}
-
-// Math display
+// =============================================================
+// Math
+// =============================================================
 .math.display {
   overflow-x: auto;
-  padding: 0.25rem 0;
+  padding: 0.5rem 0;
 }
 
+// =============================================================
 // Sidebar TOC
-#TOC {
-  font-size: 0.86rem;
+// =============================================================
+nav#TOC,
+.sidebar nav[role="doc-toc"] {
+  font-size: 0.82rem;
+}
+
+nav#TOC ul li a,
+.sidebar nav[role="doc-toc"] ul li a,
+#quarto-margin-sidebar a {
+  font-family: $brand-font-mono;
+  font-size: 0.78rem;
+  letter-spacing: -0.01em;
+  color: $brand-slate;
+
+  &:hover, &.active {
+    color: $brand-navy;
+  }
+}
+
+#toc-title {
+  font-family: $brand-font-mono;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: $brand-slate;
+  text-transform: uppercase;
 }
 
 #TOC .active {
   font-weight: 600;
-  color: $primary;
+  color: $brand-navy;
 }
 
+// =============================================================
 // References
+// =============================================================
 #refs {
+  font-family: $brand-font-serif;
   font-size: 0.9rem;
 }
 
 div.csl-entry {
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.65rem;
+}
+
+// =============================================================
+// Citation hover
+// =============================================================
+.citation,
+a.citation {
+  color: $brand-burgundy;
+  font-size: 0.92em;
+  font-weight: 400;
+  border-bottom: none;
+
+  &:hover {
+    color: $sc-verdigris-deep;
+    background: rgba($brand-gold, 0.10);
+    border-bottom: 1px solid rgba($brand-burgundy, 0.4);
+  }
+}
+
+// Footnote markers
+a.footnote-ref,
+sup a.footnote-ref,
+a[role="doc-noteref"] {
+  font-family: $brand-font-sans;
+  color: $brand-gold;
+  font-weight: 700;
+  font-size: 0.75em;
+  text-decoration: none;
+  border-bottom: none;
+  padding: 0 0.12em;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: $brand-gold;
+    color: $brand-cream;
+  }
+}
+
+// =============================================================
+// Anchor links on headings
+// =============================================================
+a.anchorjs-link,
+h2 > a.anchorjs-link,
+h3 > a.anchorjs-link,
+h4 > a.anchorjs-link {
+  font-family: $brand-font-sans;
+  font-weight: 400;
+  color: $brand-gold !important;
+  border-bottom: none !important;
+  text-decoration: none !important;
+  opacity: 0;
+  margin-left: 0.4em;
+  transition: opacity 0.18s ease;
+  display: inline-block;
+  font-size: 0.7em;
+  vertical-align: middle;
+
+  &::before { content: "#"; }
+}
+
+h1:hover > a.anchorjs-link,
+h2:hover > a.anchorjs-link,
+h3:hover > a.anchorjs-link,
+h4:hover > a.anchorjs-link { opacity: 0.7; }
+
+a.anchorjs-link:hover { opacity: 1 !important; }
+
+// =============================================================
+// Typography refinements
+// =============================================================
+
+// Inline numbers in body prose — proportional old-style
+main p,
+main li,
+main blockquote {
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  font-feature-settings: "onum" 1, "pnum" 1, "kern" 1, "liga" 1, "calt" 1;
+}
+
+// Tables always use tabular lining figures
+table, table tbody, table thead {
+  font-variant-numeric: tabular-nums lining-nums !important;
+  font-feature-settings: "tnum" 1, "lnum" 1 !important;
+}
+
+// Selection
+::selection {
+  background: rgba($brand-gold, 0.30);
+  color: $brand-charcoal;
+}
+
+// Focus rings
+*:focus-visible {
+  outline: 2px solid $brand-gold;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+// Abbreviations / definitions
+dfn,
+abbr[title] {
+  cursor: help;
+  border-bottom: 1px dotted rgba($brand-gold, 0.7);
+  text-decoration: none;
+  font-style: normal;
+
+  &:hover {
+    color: $brand-burgundy;
+    border-bottom-color: $brand-burgundy;
+  }
+}
+
+// =============================================================
+// Fade-in (respects prefers-reduced-motion)
+// =============================================================
+@keyframes fadeInPaper {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+main.content,
+#quarto-document-content {
+  animation: fadeInPaper 0.3s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  main.content,
+  #quarto-document-content { animation: none; }
+}
+
+// =============================================================
+// Print
+// =============================================================
+@media print {
+  .sidebar, .quarto-search, nav, #TOC { display: none !important; }
+  body {
+    font-size: 11pt;
+    background: white;
+    color: #111;
+    font-family: Georgia, serif;
+  }
+  a { color: #111; border-bottom: none; }
+  pre { border: 1px solid #ccc; }
 }
