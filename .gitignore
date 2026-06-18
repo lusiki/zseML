@@ -28,6 +28,8 @@ paper/pre_live_files/
 # live in docs/ (served via GitHub Pages). Keep sources (.qmd, .scss) tracked.
 paper/zse_ml_paper.html
 paper/zse_ml_paper.pdf
+paper/forecasting_thin_markets.html
+paper/forecasting_thin_markets.pdf
 .quarto/
 
 # Experiment registry (large, local only)

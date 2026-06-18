@@ -2,7 +2,9 @@
 title: "Primjena modela strojnog učenja za predviđanje očekivanih prinosa dionica u RH"
 subtitle: "Application of Machine Learning Models for Predicting Expected Stock Returns in Croatia"
 author:
-  - name: "Mislav Sagovac"
+  - name: "Mislav Šagovac"
+  - name: "Luka Šikić"
+  - name: "Petra Palić"
 date: last-modified
 lang: hr
 abstract: |

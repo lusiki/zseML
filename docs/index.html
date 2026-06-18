@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="hr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Strojno učenje za predviđanje prinosa na ZSE — Mislav Sagovac</title>
-<meta name="description" content="Primjena modela strojnog učenja za predviđanje očekivanih prinosa dionica na Zagrebačkoj burzi (2000.–2024.).">
+<title>Forecasting Returns in Thin Markets — Machine Learning on the Zagreb Stock Exchange</title>
+<meta name="description" content="Machine learning for forecasting weekly stock returns on the Zagreb Stock Exchange (ZSE), a thin frontier market. By Mislav Šagovac, Luka Šikić, and Petra Palić.">
 <style>
   :root {
     --primary: #0b5d6b;
@@ -22,10 +22,10 @@
     font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
     color: var(--ink);
     background: linear-gradient(160deg, #eef4f5 0%, #f6f9fa 40%, #ffffff 100%);
-    line-height: 1.6;
+    line-height: 1.65;
     min-height: 100vh;
   }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+  .wrap { max-width: 840px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
   header { border-bottom: 3px solid var(--primary); padding-bottom: 1.5rem; margin-bottom: 2rem; }
   .eyebrow {
     text-transform: uppercase;
@@ -38,13 +38,12 @@
   h1 {
     font-size: 2.1rem;
     line-height: 1.2;
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.6rem;
     color: var(--primary);
     letter-spacing: -0.015em;
   }
-  .subtitle { font-style: italic; color: var(--muted); font-size: 1.1rem; margin: 0 0 1rem; }
-  .author { font-weight: 600; color: var(--ink); }
-  .meta { color: var(--muted); font-size: 0.92rem; }
+  .authors { font-weight: 600; color: var(--ink); margin: 0 0 0.3rem; }
+  .meta { color: var(--muted); font-size: 0.92rem; margin: 0; }
   .abstract {
     background: var(--card);
     border: 1px solid var(--border);
@@ -61,8 +60,9 @@
     letter-spacing: 0.08em;
     color: var(--primary);
   }
-  .abstract p { margin: 0; font-size: 0.97rem; color: #2c3742; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 2.5rem 0; }
+  .abstract p { margin: 0 0 0.7rem; font-size: 0.96rem; color: #2c3742; }
+  .abstract p:last-child { margin-bottom: 0; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 2.5rem 0 1rem; }
   .card {
     display: block;
     text-decoration: none;
@@ -85,9 +85,38 @@
   .card.primary .label, .card.primary .desc, .card.primary .icon { color: #fff; }
   .card.primary .desc { color: #cfe6ea; }
   .card.primary:hover { background: var(--primary-dark); }
-  h2.section { color: var(--primary); font-size: 1.3rem; margin: 2.5rem 0 0.8rem; }
+  h2.section { color: var(--primary); font-size: 1.3rem; margin: 2.8rem 0 0.8rem; }
   ul.findings { padding-left: 1.2rem; }
   ul.findings li { margin-bottom: 0.5rem; }
+  .secondary-paper {
+    background: #f3f6f7;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.3rem 1.5rem;
+    margin: 1rem 0;
+  }
+  .secondary-paper .tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    color: var(--muted);
+    background: #e3e9eb;
+    padding: 0.15rem 0.55rem;
+    border-radius: 20px;
+    margin-bottom: 0.6rem;
+  }
+  .secondary-paper h3 { margin: 0 0 0.3rem; font-size: 1.1rem; color: var(--ink); }
+  .secondary-paper p { margin: 0 0 0.8rem; color: var(--muted); font-size: 0.9rem; }
+  .secondary-paper .links a {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-right: 1.2rem;
+  }
+  .secondary-paper .links a:hover { text-decoration: underline; }
   .note {
     background: #fff8f0;
     border: 1px solid #f0dcc4;
@@ -111,73 +140,87 @@
 <body>
 <div class="wrap">
   <header>
-    <p class="eyebrow">Istraživački rad · Financije i strojno učenje</p>
-    <h1>Primjena modela strojnog učenja za predviđanje očekivanih prinosa dionica u RH</h1>
-    <p class="subtitle">Application of Machine Learning Models for Predicting Expected Stock Returns in Croatia</p>
-    <p class="author">Mislav Sagovac</p>
-    <p class="meta">Zagrebačka burza (ZSE) · razdoblje 2000.–2024.</p>
+    <p class="eyebrow">Research paper · Finance &amp; Machine Learning</p>
+    <h1>Forecasting Returns in Thin Markets: A Machine Learning Approach to the Zagreb Stock Exchange</h1>
+    <p class="authors">Mislav Šagovac · Luka Šikić · Petra Palić</p>
+    <p class="meta">Zagreb Stock Exchange (ZSE) · sample period 2000–2024</p>
   </header>
 
   <div class="abstract">
-    <h2>Sažetak</h2>
+    <h2>Abstract</h2>
     <p>
-      Ovaj rad istražuje primjenu modela strojnog učenja za predviđanje očekivanih
-      prinosa dionica na Zagrebačkoj burzi (ZSE) u razdoblju od 2000. do 2024. godine.
-      Koristi se velik skup prediktora izvedenih iz dnevnih podataka o trgovanju te
-      ugniježđena metoda križne validacije s pomičnim prozorom (NRWCV). Uspoređuju se
-      četiri modela — Random Forest, XGBoost, GLMNET i neuronska mreža (NNET) — kao i
-      njihovi jednostavni ansambli. Rezultati pokazuju da modeli stabala odlučivanja
-      (Random Forest) i neuronske mreže ostvaruju najbolji odnos rizika i prinosa, a
-      ansambli predikcija dodatno poboljšavaju uspješnost na relativno nelikvidnom i
-      plitkom hrvatskom tržištu kapitala.
+      <strong>Purpose.</strong> This paper investigates the out-of-sample predictability of
+      weekly stock returns on the Zagreb Stock Exchange (ZSE), a thin frontier market
+      characterized by low liquidity and concentrated ownership, and asks whether machine
+      learning can extract predictive signal in this environment.
+    </p>
+    <p>
+      <strong>Methodology.</strong> We construct over 1,100 predictors from daily OHLCV data
+      (2000–2024) — technical indicators, time-series features, and wavelet decompositions —
+      and evaluate four models (Elastic Net, Random Forest, XGBoost, and a shallow neural
+      network) within a rigorous nested rolling-window cross-validation framework, assessed
+      via statistical metrics and a realistic portfolio backtest.
+    </p>
+    <p>
+      <strong>Results.</strong> Directional accuracy is modest (46–53%), with nonlinear
+      ensembles and neural networks outperforming the linear benchmark. A key finding is a
+      strong monotonic liquidity gradient: portfolio Sharpe ratios rise from 0.17 for the most
+      liquid stocks to 1.58 for the full universe (up to 1.97 for the best individual model),
+      indicating substantially higher predictability in illiquid securities.
+    </p>
+    <p>
+      <strong>Conclusion.</strong> Machine learning generates economically significant signals
+      in frontier markets, but predictability concentrates in thinly traded stocks where
+      transaction costs and market depth constrain practical implementation — highlighting
+      liquidity as a critical factor in return predictability.
     </p>
   </div>
 
   <div class="cards">
-    <a class="card primary" href="zse_ml_paper.html">
+    <a class="card primary" href="forecasting_thin_markets.html">
       <div class="icon">📖</div>
-      <p class="label">Čitaj online (HTML)</p>
-      <p class="desc">Potpuni rad s interaktivnim sadržajem, jednadžbama i kôdom</p>
+      <p class="label">Read online (HTML)</p>
+      <p class="desc">Full paper with interactive contents, tables, and code</p>
     </a>
-    <a class="card" href="zse_ml_paper.pdf">
+    <a class="card" href="forecasting_thin_markets.pdf">
       <div class="icon">📄</div>
-      <p class="label">Preuzmi PDF</p>
-      <p class="desc">Verzija za ispis i citiranje</p>
-    </a>
-    <a class="card" href="zse_ml_paper.docx">
-      <div class="icon">📝</div>
-      <p class="label">Word (DOCX)</p>
-      <p class="desc">Izvorni dokument za uređivanje</p>
+      <p class="label">Download PDF</p>
+      <p class="desc">Print- and citation-ready version</p>
     </a>
   </div>
 
-  <h2 class="section">Ključni nalazi</h2>
+  <h2 class="section">Key findings</h2>
   <ul class="findings">
-    <li>Modeli <strong>Random Forest</strong> i <strong>neuronske mreže</strong> ostvaruju najbolji odnos rizika i prinosa (najviši Sharpeov omjer).</li>
-    <li><strong>Ansambli</strong> predikcija (medijan i prosjek) nadmašuju pojedinačne modele.</li>
-    <li>Novi <strong>prediktori izvedeni iz dnevnih podataka o trgovanju</strong> ključni su za visoku učinkovitost modela.</li>
-    <li>Strojno učenje pokazuje potencijal na <strong>plitkom i nelikvidnom</strong> tržištu poput hrvatskog.</li>
+    <li><strong>Modest but real predictability:</strong> directional accuracy of 46–53%, exceeding random chance and a random-walk benchmark.</li>
+    <li><strong>Nonlinear models win:</strong> Random Forest, XGBoost, and the neural network beat the penalized-linear Elastic Net in portfolio terms.</li>
+    <li><strong>Ensembles add value:</strong> forecast combinations (mean / median) match or exceed the best individual model.</li>
+    <li><strong>Liquidity gradient:</strong> risk-adjusted performance rises monotonically as the universe widens to include less-liquid stocks (Sharpe 0.17 → 1.58).</li>
+    <li><strong>Implementation caveat:</strong> the highest gross returns come from illiquid stocks where transaction costs bite hardest — backtest figures are an upper bound.</li>
   </ul>
 
-  <h2 class="section">Metodologija</h2>
-  <ul class="findings">
-    <li>Trgovinski podaci svih dionica na ZSE, tjedna frekvencija s tjednim horizontom.</li>
-    <li>Velik skup prediktora (testovi eksplozivnosti, strukturni lomovi, tehnički indikatori, wavelet-ARIMA, tsfel/catch22 značajke).</li>
-    <li>Ugniježđena metoda križne validacije s pomičnim prozorom (NRWCV) za realnu procjenu na neviđenim podacima.</li>
-    <li>Ugađanje hiperparametara i predobrada (winsorizacija, filtriranje prediktora pomoću JMI i Relief).</li>
-  </ul>
+  <h2 class="section">Earlier version</h2>
+  <div class="secondary-paper">
+    <span class="tag">Croatian · prior version</span>
+    <h3>Primjena modela strojnog učenja za predviđanje očekivanih prinosa dionica u RH</h3>
+    <p>An earlier, Croatian-language version of this research line on machine learning for ZSE return prediction.</p>
+    <div class="links">
+      <a href="zse_ml_paper.html">Read online (HTML) →</a>
+      <a href="zse_ml_paper.pdf">PDF →</a>
+      <a href="zse_ml_paper.docx">DOCX →</a>
+    </div>
+  </div>
 
   <div class="note">
-    <strong>Napomena o reproducibilnosti:</strong> analitički dijelovi rada oslanjaju se na
-    podatke o trgovanju i registar rezultata koji nisu dio ovog repozitorija. U objavljenoj
-    inačici dokumenta kôd je prikazan, ali se ne izvršava; tekst, jednadžbe i opis metodologije
-    u potpunosti su prikazani. Za reprodukciju svih tablica i slika potrebno je pokrenuti
-    <code>zse_ml_paper.qmd</code> s izvornim podacima.
+    <strong>A note on reproducibility:</strong> the main paper's tables are self-contained and
+    render in full. Two figures reference chart images that are not bundled here; add
+    <code>fig3_cropped.png</code> and <code>fig4_cropped.png</code> to the <code>paper/</code>
+    folder and re-render to display them. The earlier Croatian paper depends on proprietary
+    data, so its analysis code is shown but not executed.
   </div>
 
   <footer>
-    <p>Izvorni kôd i podaci: <a href="https://github.com/lusiki/zseML">github.com/lusiki/zseML</a></p>
-    <p>Generirano pomoću <a href="https://quarto.org">Quarto</a>.</p>
+    <p>Source code and data: <a href="https://github.com/lusiki/zseML">github.com/lusiki/zseML</a></p>
+    <p>Generated with <a href="https://quarto.org">Quarto</a>.</p>
   </footer>
 </div>
 </body>
