@@ -37,21 +37,59 @@ format:
       - bottom=2.5cm
       - left=3cm
       - right=3cm
-    fontsize: 12pt
-    linestretch: 1.3
+    fontsize: 11pt
+    linestretch: 1.35
     papersize: a4
     colorlinks: true
+    linkcolor: verdigris
+    urlcolor: verdigris
+    citecolor: verdigris
     fig-pos: "H"
     header-includes: |
+      %% --- Statecraft PDF theme ---
+      %% Fonts via fontspec (XeLaTeX/LuaLaTeX)
+      \usepackage{fontspec}
+      \setmainfont{TeX Gyre Pagella}[Ligatures=TeX, Numbers=OldStyle]
+      \setsansfont{TeX Gyre Heros}[Scale=MatchLowercase, Ligatures=TeX]
+      \setmonofont{InconsolataN}[Scale=MatchLowercase]
+      %% Micro-typography
+      \usepackage{microtype}
+      %% Table packages
       \usepackage{booktabs}
       \usepackage{longtable}
       \usepackage{array}
       \usepackage{multirow}
       \usepackage{float}
-      \usepackage{caption}
-      \captionsetup[table]{skip=6pt}
       \usepackage{threeparttable}
       \usepackage{threeparttablex}
+      %% Caption styling
+      \usepackage{caption}
+      \captionsetup{font={small,it}, labelfont={bf,small}, labelsep=period,
+                    skip=6pt, justification=centering}
+      \captionsetup[table]{skip=6pt, position=top}
+      %% Verdigris heading colour (#3A5648)
+      \usepackage{xcolor}
+      \definecolor{verdigris}{HTML}{3A5648}
+      \definecolor{ink}{HTML}{1C1916}
+      \definecolor{slate}{HTML}{6B6357}
+      %% Section heading colours via KOMA-script (no titlesec — conflicts with scrartcl)
+      \addtokomafont{section}{\color{verdigris}}
+      \addtokomafont{subsection}{\color{ink}}
+      \addtokomafont{subsubsection}{\itshape\color{ink}}
+      \addtokomafont{sectionentry}{\color{ink}}
+      \addtokomafont{pagenumber}{\color{slate}\small}
+      %% Header/footer via fancyhdr
+      \usepackage{fancyhdr}
+      \pagestyle{fancy}
+      \fancyhf{}
+      \renewcommand{\headrulewidth}{0.3pt}
+      \renewcommand{\headrule}{\hbox to\headwidth{\color{verdigris}\leaders\hrule height \headrulewidth\hfill}}
+      \fancyhead[L]{\small\color{slate}\itshape Forecasting Returns in Thin Markets}
+      \fancyhead[R]{\small\color{slate}Šagovac · Šikić · Palić}
+      \fancyfoot[C]{\small\color{slate}\thepage}
+      %% Paragraph spacing — no indent, small skip
+      \setlength{\parindent}{0pt}
+      \setlength{\parskip}{5pt plus 1pt}
 execute:
   echo: false
   warning: false

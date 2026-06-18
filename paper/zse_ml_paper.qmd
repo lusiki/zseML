@@ -52,15 +52,46 @@ format:
     toc-depth: 3
     number-sections: true
     colorlinks: true
+    linkcolor: verdigris
+    urlcolor: verdigris
+    citecolor: verdigris
     geometry:
       - margin=2.5cm
+    fontsize: 11pt
+    linestretch: 1.35
     fig-cap-location: bottom
     tbl-cap-location: top
     highlight-style: github
     include-in-header:
       text: |
-        \usepackage{booktabs}
+        %% --- Statecraft PDF theme ---
+        \usepackage{fontspec}
+        \setmainfont{TeX Gyre Pagella}[Ligatures=TeX, Numbers=OldStyle]
+        \setsansfont{TeX Gyre Heros}[Scale=MatchLowercase, Ligatures=TeX]
+        \setmonofont{InconsolataN}[Scale=MatchLowercase]
         \usepackage{microtype}
+        \usepackage{booktabs}
+        \usepackage{caption}
+        \captionsetup{font={small,it}, labelfont={bf,small}, labelsep=period,
+                      skip=6pt, justification=centering}
+        \captionsetup[table]{skip=6pt, position=top}
+        \usepackage{xcolor}
+        \definecolor{verdigris}{HTML}{3A5648}
+        \definecolor{ink}{HTML}{1C1916}
+        \definecolor{slate}{HTML}{6B6357}
+        \addtokomafont{section}{\color{verdigris}}
+        \addtokomafont{subsection}{\color{ink}}
+        \addtokomafont{subsubsection}{\itshape\color{ink}}
+        \usepackage{fancyhdr}
+        \pagestyle{fancy}
+        \fancyhf{}
+        \renewcommand{\headrulewidth}{0.3pt}
+        \renewcommand{\headrule}{\hbox to\headwidth{\color{verdigris}\leaders\hrule height \headrulewidth\hfill}}
+        \fancyhead[L]{\small\color{slate}\itshape Strojno učenje za predviđanje prinosa dionica na ZSE}
+        \fancyhead[R]{\small\color{slate}Šagovac · Šikić · Palić}
+        \fancyfoot[C]{\small\color{slate}\thepage}
+        \setlength{\parindent}{0pt}
+        \setlength{\parskip}{5pt plus 1pt}
   docx:
     toc: false
     number-sections: true

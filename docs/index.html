@@ -5,149 +5,443 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forecasting Returns in Thin Markets — Machine Learning on the Zagreb Stock Exchange</title>
 <meta name="description" content="Machine learning for forecasting weekly stock returns on the Zagreb Stock Exchange (ZSE), a thin frontier market. By Mislav Šagovac, Luka Šikić, and Petra Palić.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Public+Sans:ital,wght@0,300..800;1,300..800&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
+  /* === Statecraft tokens === */
   :root {
-    --primary: #0b5d6b;
-    --primary-dark: #084853;
-    --accent: #c4661f;
-    --ink: #1f2933;
-    --muted: #5b6671;
-    --bg: #f6f9fa;
-    --card: #ffffff;
-    --border: #e3e6ea;
+    --ink:           #1C1916;
+    --ink-mute:      #6B6357;
+    --ink-faint:     #9C9382;
+    --verdigris:     #4A6B5C;
+    --verdigris-deep:#3A5648;
+    --paper:         #F2EDE3;
+    --paper-soft:    #EAE3D4;
+    --paper-wash:    #DDE5DF;
+    --oxblood:       #6B1F26;
+    --ochre:         #C8985E;
+    --rule:          rgba(28,25,22,0.14);
+    --rule-strong:   rgba(28,25,22,0.30);
+    --rule-faint:    rgba(28,25,22,0.07);
   }
-  * { box-sizing: border-box; }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
   body {
     margin: 0;
-    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-    color: var(--ink);
-    background: linear-gradient(160deg, #eef4f5 0%, #f6f9fa 40%, #ffffff 100%);
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 17px;
     line-height: 1.65;
-    min-height: 100vh;
+    color: var(--ink);
+    background: var(--paper);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "kern" 1, "liga" 1, "onum" 1;
   }
-  .wrap { max-width: 840px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
-  header { border-bottom: 3px solid var(--primary); padding-bottom: 1.5rem; margin-bottom: 2rem; }
+
+  ::selection {
+    background: rgba(74,107,92,0.25);
+    color: var(--ink);
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 5rem;
+  }
+
+  /* === Header === */
+  header {
+    padding-bottom: 2rem;
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
   .eyebrow {
+    font-family: "Public Sans", system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin: 0 0 1rem;
+  }
+
+  h1 {
+    font-family: "Newsreader", Georgia, serif;
+    font-size: clamp(1.6rem, 4vw + 0.5rem, 2.5rem);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.018em;
+    color: var(--ink);
+    margin: 0 0 1.25rem;
+  }
+
+  h1::after {
+    content: "";
+    display: block;
+    width: 50px;
+    height: 2px;
+    background: var(--verdigris);
+    margin-top: 1.1rem;
+    border-radius: 1px;
+  }
+
+  .authors {
+    font-family: "Public Sans", system-ui, sans-serif;
+    font-size: 0.88rem;
+    color: var(--ink-mute);
+    margin: 0 0 0.3rem;
+    letter-spacing: 0.02em;
+  }
+
+  .meta {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    margin: 0;
+    letter-spacing: 0.01em;
+  }
+
+  /* === Abstract === */
+  .abstract {
+    background: rgba(221,229,223,0.35);
+    border: 1px solid rgba(28,25,22,0.08);
+    border-left: 4px solid var(--verdigris);
+    padding: 1.3rem 1.6rem;
+    border-radius: 0 6px 6px 0;
+    margin: 2.5rem 0;
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 0.97rem;
+  }
+
+  .abstract-label {
+    font-family: "Public Sans", system-ui, sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--accent);
-    margin: 0 0 0.6rem;
+    color: var(--verdigris);
+    display: block;
+    margin-bottom: 0.75rem;
   }
-  h1 {
-    font-size: 2.1rem;
-    line-height: 1.2;
-    margin: 0 0 0.6rem;
-    color: var(--primary);
-    letter-spacing: -0.015em;
+
+  .abstract p {
+    margin: 0 0 0.7rem;
+    color: var(--ink);
   }
-  .authors { font-weight: 600; color: var(--ink); margin: 0 0 0.3rem; }
-  .meta { color: var(--muted); font-size: 0.92rem; margin: 0; }
-  .abstract {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--primary);
-    padding: 1.3rem 1.5rem;
-    border-radius: 0 8px 8px 0;
-    margin: 2rem 0;
-    box-shadow: 0 1px 8px rgba(11, 93, 107, 0.05);
-  }
-  .abstract h2 {
-    margin: 0 0 0.6rem;
-    font-size: 0.8rem;
+  .abstract p:last-child { margin-bottom: 0; }
+
+  .abstract strong {
+    font-family: "Public Sans", system-ui, sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--primary);
+    color: var(--verdigris-deep);
   }
-  .abstract p { margin: 0 0 0.7rem; font-size: 0.96rem; color: #2c3742; }
-  .abstract p:last-child { margin-bottom: 0; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin: 2.5rem 0 1rem; }
-  .card {
-    display: block;
+
+  /* === CTA buttons === */
+  .cta-row {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 2rem 0;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 1.4rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    border-radius: 2px;
     text-decoration: none;
-    color: inherit;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1.4rem;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    transition: background 0.14s ease, color 0.14s ease;
+    border: 1px solid var(--rule-strong);
   }
-  .card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(11, 93, 107, 0.12);
-    border-color: var(--primary);
+
+  .btn-primary {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
   }
-  .card .icon { font-size: 1.6rem; }
-  .card .label { font-weight: 650; color: var(--primary); margin: 0.5rem 0 0.2rem; font-size: 1.05rem; }
-  .card .desc { color: var(--muted); font-size: 0.86rem; margin: 0; }
-  .card.primary { background: var(--primary); border-color: var(--primary); }
-  .card.primary .label, .card.primary .desc, .card.primary .icon { color: #fff; }
-  .card.primary .desc { color: #cfe6ea; }
-  .card.primary:hover { background: var(--primary-dark); }
-  h2.section { color: var(--primary); font-size: 1.3rem; margin: 2.8rem 0 0.8rem; }
-  ul.findings { padding-left: 1.2rem; }
-  ul.findings li { margin-bottom: 0.5rem; }
-  .secondary-paper {
-    background: #f3f6f7;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1.3rem 1.5rem;
+  .btn-primary:hover {
+    background: var(--paper-soft);
+    color: var(--ink);
+    border-color: var(--ink);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--rule-strong);
+  }
+  .btn-secondary:hover {
+    background: var(--paper-soft);
+    color: var(--ink);
+  }
+
+  /* === Stats strip === */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin: 2.5rem 0;
+  }
+
+  .stat {
+    background: var(--paper);
+    text-align: center;
+    padding: 1.25rem 0.5rem;
+  }
+
+  .stat-num {
+    display: block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ink);
+    margin-bottom: 0.45rem;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .stat-plus { color: var(--verdigris); }
+
+  .stat-label {
+    display: block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    line-height: 1.4;
+  }
+
+  @media (max-width: 520px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* === Section headings === */
+  h2.section {
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    margin: 3rem 0 0.9rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(28,25,22,0.08);
+    line-height: 1.25;
+  }
+
+  /* === Findings list === */
+  ul.findings {
+    padding-left: 0;
+    list-style: none;
+    margin: 0 0 1rem;
+  }
+
+  ul.findings li {
+    position: relative;
+    padding: 0.6rem 0 0.6rem 1.6rem;
+    border-bottom: 1px solid var(--rule-faint);
+    font-size: 0.97rem;
+  }
+
+  ul.findings li:first-child { border-top: 1px solid var(--rule-faint); }
+
+  ul.findings li::before {
+    content: "◆";
+    position: absolute;
+    left: 0;
+    top: 0.65rem;
+    font-size: 0.55rem;
+    color: var(--verdigris);
+    line-height: 1.65;
+  }
+
+  ul.findings li strong {
+    font-family: "Public Sans", system-ui, sans-serif;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--ink);
+    display: block;
+    margin-bottom: 0.1rem;
+  }
+
+  /* === Earlier version card === */
+  .earlier-card {
+    background: var(--paper-soft);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1.4rem 1.6rem;
     margin: 1rem 0;
   }
-  .secondary-paper .tag {
+
+  .tag {
     display: inline-block;
-    font-size: 0.7rem;
+    font-family: "Public Sans", system-ui, sans-serif;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: 600;
-    color: var(--muted);
-    background: #e3e9eb;
-    padding: 0.15rem 0.55rem;
-    border-radius: 20px;
-    margin-bottom: 0.6rem;
+    color: var(--ink-mute);
+    background: var(--paper-wash);
+    border: 1px solid var(--rule);
+    padding: 0.18rem 0.55rem;
+    border-radius: 2px;
+    margin-bottom: 0.75rem;
   }
-  .secondary-paper h3 { margin: 0 0 0.3rem; font-size: 1.1rem; color: var(--ink); }
-  .secondary-paper p { margin: 0 0 0.8rem; color: var(--muted); font-size: 0.9rem; }
-  .secondary-paper .links a {
-    color: var(--primary);
+
+  .earlier-card h3 {
+    font-family: "Newsreader", Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--ink);
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.01em;
+  }
+
+  .earlier-card p {
+    font-size: 0.9rem;
+    color: var(--ink-mute);
+    margin: 0 0 0.9rem;
+  }
+
+  .earlier-card .links {
+    display: flex;
+    gap: 1.2rem;
+    flex-wrap: wrap;
+  }
+
+  .earlier-card .links a {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--verdigris-deep);
     text-decoration: none;
-    font-size: 0.9rem;
-    font-weight: 600;
-    margin-right: 1.2rem;
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid rgba(58,86,72,0.3);
+    padding-bottom: 1px;
+    transition: color 0.15s, border-color 0.15s;
   }
-  .secondary-paper .links a:hover { text-decoration: underline; }
+
+  .earlier-card .links a:hover {
+    color: var(--ink);
+    border-bottom-color: var(--ink);
+  }
+
+  /* === Reproducibility note === */
   .note {
-    background: #fff8f0;
-    border: 1px solid #f0dcc4;
-    border-radius: 8px;
+    background: rgba(200,152,94,0.10);
+    border: 1px solid rgba(200,152,94,0.35);
+    border-left: 3px solid var(--ochre);
+    border-radius: 0 4px 4px 0;
     padding: 1rem 1.2rem;
-    font-size: 0.9rem;
-    color: #7a5320;
-    margin: 2rem 0;
+    font-family: "Public Sans", system-ui, sans-serif;
+    font-size: 0.87rem;
+    color: var(--ink);
+    margin: 2.5rem 0;
+    line-height: 1.55;
   }
+
+  .note strong {
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.84em;
+    background: rgba(28,25,22,0.06);
+    color: var(--oxblood);
+    padding: 0.07em 0.32em;
+    border-radius: 3px;
+  }
+
+  /* === Footer === */
   footer {
-    margin-top: 3rem;
+    margin-top: 3.5rem;
     padding-top: 1.5rem;
-    border-top: 1px solid var(--border);
-    color: var(--muted);
-    font-size: 0.85rem;
+    border-top: 1px solid var(--rule);
+    font-family: "Public Sans", system-ui, sans-serif;
+    font-size: 0.82rem;
+    color: var(--ink-mute);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
-  footer a { color: var(--primary); }
-  code { background: #eef2f3; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.85em; }
+
+  footer a {
+    color: var(--verdigris-deep);
+    text-decoration: none;
+    border-bottom: 1px dotted rgba(58,86,72,0.4);
+  }
+  footer a:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
+  /* === Fade in === */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .wrap { animation: fadeIn 0.3s ease-out; }
+  @media (prefers-reduced-motion: reduce) { .wrap { animation: none; } }
+
+  /* === Responsive === */
+  @media (max-width: 600px) {
+    .wrap { padding: 2rem 1.1rem 3rem; }
+    h1 { font-size: 1.55rem; }
+    .cta-row { flex-direction: column; }
+    .btn { justify-content: center; }
+    footer { flex-direction: column; align-items: flex-start; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
+
   <header>
     <p class="eyebrow">Research paper · Finance &amp; Machine Learning</p>
     <h1>Forecasting Returns in Thin Markets: A Machine Learning Approach to the Zagreb Stock Exchange</h1>
-    <p class="authors">Mislav Šagovac · Luka Šikić · Petra Palić</p>
-    <p class="meta">Zagreb Stock Exchange (ZSE) · sample period 2000–2024</p>
+    <p class="authors">Mislav Šagovac &nbsp;·&nbsp; Luka Šikić &nbsp;·&nbsp; Petra Palić</p>
+    <p class="meta">Zagreb Stock Exchange (ZSE) &nbsp;·&nbsp; sample period 2000–2024</p>
   </header>
 
+  <!-- Stats strip -->
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-num">1,100<span class="stat-plus">+</span></span>
+      <span class="stat-label">predictors</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">4</span>
+      <span class="stat-label">ML models</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">24</span>
+      <span class="stat-label">years of data</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">1.58</span>
+      <span class="stat-label">peak Sharpe ratio</span>
+    </div>
+  </div>
+
+  <!-- Abstract -->
   <div class="abstract">
-    <h2>Abstract</h2>
+    <span class="abstract-label">Abstract</span>
     <p>
       <strong>Purpose.</strong> This paper investigates the out-of-sample predictability of
       weekly stock returns on the Zagreb Stock Exchange (ZSE), a thin frontier market
@@ -165,41 +459,49 @@
       <strong>Results.</strong> Directional accuracy is modest (46–53%), with nonlinear
       ensembles and neural networks outperforming the linear benchmark. A key finding is a
       strong monotonic liquidity gradient: portfolio Sharpe ratios rise from 0.17 for the most
-      liquid stocks to 1.58 for the full universe (up to 1.97 for the best individual model),
-      indicating substantially higher predictability in illiquid securities.
+      liquid stocks to 1.58 for the full universe (up to 1.97 for the best individual model).
     </p>
     <p>
       <strong>Conclusion.</strong> Machine learning generates economically significant signals
       in frontier markets, but predictability concentrates in thinly traded stocks where
-      transaction costs and market depth constrain practical implementation — highlighting
-      liquidity as a critical factor in return predictability.
+      transaction costs and market depth constrain practical implementation.
     </p>
   </div>
 
-  <div class="cards">
-    <a class="card primary" href="forecasting_thin_markets.html">
-      <div class="icon">📖</div>
-      <p class="label">Read online (HTML)</p>
-      <p class="desc">Full paper with interactive contents, tables, and code</p>
-    </a>
-    <a class="card" href="forecasting_thin_markets.pdf">
-      <div class="icon">📄</div>
-      <p class="label">Download PDF</p>
-      <p class="desc">Print- and citation-ready version</p>
-    </a>
+  <!-- CTA buttons -->
+  <div class="cta-row">
+    <a class="btn btn-primary" href="forecasting_thin_markets.html">Read online (HTML)</a>
+    <a class="btn btn-secondary" href="forecasting_thin_markets.pdf">Download PDF</a>
   </div>
 
+  <!-- Key findings -->
   <h2 class="section">Key findings</h2>
   <ul class="findings">
-    <li><strong>Modest but real predictability:</strong> directional accuracy of 46–53%, exceeding random chance and a random-walk benchmark.</li>
-    <li><strong>Nonlinear models win:</strong> Random Forest, XGBoost, and the neural network beat the penalized-linear Elastic Net in portfolio terms.</li>
-    <li><strong>Ensembles add value:</strong> forecast combinations (mean / median) match or exceed the best individual model.</li>
-    <li><strong>Liquidity gradient:</strong> risk-adjusted performance rises monotonically as the universe widens to include less-liquid stocks (Sharpe 0.17 → 1.58).</li>
-    <li><strong>Implementation caveat:</strong> the highest gross returns come from illiquid stocks where transaction costs bite hardest — backtest figures are an upper bound.</li>
+    <li>
+      <strong>Modest but real predictability</strong>
+      Directional accuracy of 46–53%, exceeding random chance and a random-walk benchmark.
+    </li>
+    <li>
+      <strong>Nonlinear models win</strong>
+      Random Forest, XGBoost, and the neural network beat the penalized-linear Elastic Net in portfolio terms.
+    </li>
+    <li>
+      <strong>Ensembles add value</strong>
+      Forecast combinations (mean / median) match or exceed the best individual model.
+    </li>
+    <li>
+      <strong>Liquidity gradient</strong>
+      Risk-adjusted performance rises monotonically as the universe widens to include less-liquid stocks — Sharpe 0.17 → 1.58.
+    </li>
+    <li>
+      <strong>Implementation caveat</strong>
+      The highest gross returns come from illiquid stocks where transaction costs bite hardest — backtest figures are an upper bound.
+    </li>
   </ul>
 
+  <!-- Earlier version -->
   <h2 class="section">Earlier version</h2>
-  <div class="secondary-paper">
+  <div class="earlier-card">
     <span class="tag">Croatian · prior version</span>
     <h3>Primjena modela strojnog učenja za predviđanje očekivanih prinosa dionica u RH</h3>
     <p>An earlier, Croatian-language version of this research line on machine learning for ZSE return prediction.</p>
@@ -210,18 +512,20 @@
     </div>
   </div>
 
+  <!-- Reproducibility note -->
   <div class="note">
-    <strong>A note on reproducibility:</strong> the main paper's tables are self-contained and
-    render in full. Two figures reference chart images that are not bundled here; add
+    <strong>Reproducibility:</strong> the main paper's tables are self-contained and render
+    in full. Two figures reference chart images not bundled in this repository — add
     <code>fig3_cropped.png</code> and <code>fig4_cropped.png</code> to the <code>paper/</code>
     folder and re-render to display them. The earlier Croatian paper depends on proprietary
     data, so its analysis code is shown but not executed.
   </div>
 
   <footer>
-    <p>Source code and data: <a href="https://github.com/lusiki/zseML">github.com/lusiki/zseML</a></p>
-    <p>Generated with <a href="https://quarto.org">Quarto</a>.</p>
+    <span>Source: <a href="https://github.com/lusiki/zseML">github.com/lusiki/zseML</a></span>
+    <span>Rendered with <a href="https://quarto.org">Quarto</a></span>
   </footer>
+
 </div>
 </body>
 </html>
